@@ -155,11 +155,11 @@ export function startArchiver(options: ArchiverOptions): ArchiverResult {
   })()
 
   return {
-    stop() {
+    async stop() {
       stopped = true
       if (subplebbit) {
         subplebbit.removeListener('update', updateHandler)
-        subplebbit.stop?.()
+        await subplebbit.stop?.()
       }
       log(`archiver stopped for ${subplebbitAddress}`)
     },

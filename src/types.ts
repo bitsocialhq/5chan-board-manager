@@ -13,7 +13,7 @@ export interface ArchiverOptions {
 }
 
 export interface ArchiverResult {
-  stop: () => void
+  stop: () => Promise<void>
 }
 
 export interface SignerState {

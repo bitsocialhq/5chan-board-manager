@@ -21,11 +21,11 @@ const archiver = startArchiver({
 })
 
 // Later, to stop:
-archiver.stop()
+await archiver.stop()
 ```
 
 - `plebbit` is a Plebbit instance from the caller
-- Returns `{ stop(): void }` — stops the archiver and cleans up event listeners
+- Returns `{ stop(): Promise<void> }` — stops the archiver and cleans up event listeners
 
 ## CLI Usage
 

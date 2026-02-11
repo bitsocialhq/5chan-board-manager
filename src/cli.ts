@@ -38,12 +38,12 @@ const archiver = startArchiver({
   archivePurgeSeconds,
 })
 
-process.on('SIGINT', () => {
-  archiver.stop()
+process.on('SIGINT', async () => {
+  await archiver.stop()
   process.exit(0)
 })
 
-process.on('SIGTERM', () => {
-  archiver.stop()
+process.on('SIGTERM', async () => {
+  await archiver.stop()
   process.exit(0)
 })

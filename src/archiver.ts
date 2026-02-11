@@ -1,7 +1,7 @@
 import Logger from '@plebbit/plebbit-logger'
 import { join } from 'node:path'
 import { loadState, saveState } from './state.js'
-import type { ArchiverOptions, ArchiverResult, ArchiverState } from './types.js'
+import type { ArchiverOptions, ArchiverResult, ArchiverState, Subplebbit, Signer, ThreadComment, Page } from './types.js'
 
 const log = Logger('5chan-archiver')
 
@@ -29,7 +29,7 @@ export function startArchiver(options: ArchiverOptions): ArchiverResult {
 
   log(`starting archiver for ${subplebbitAddress} (capacity=${maxThreads}, bumpLimit=${bumpLimit}, purgeAfter=${archivePurgeSeconds}s)`)
 
-  async function ensureModRole(subplebbit: any, signerAddress: string): Promise<void> {
+  async function ensureModRole(subplebbit: Subplebbit, signerAddress: string): Promise<void> {
     const roles = subplebbit.roles ?? {}
     if (roles[signerAddress]?.role === 'moderator' || roles[signerAddress]?.role === 'admin' || roles[signerAddress]?.role === 'owner') {
       return
@@ -43,7 +43,7 @@ export function startArchiver(options: ArchiverOptions): ArchiverResult {
     })
   }
 
-  async function getOrCreateSigner(): Promise<any> {
+  async function getOrCreateSigner(): Promise<Signer> {
     if (state.signers[subplebbitAddress]) {
       return plebbit.createSigner({ privateKey: state.signers[subplebbitAddress].privateKey, type: 'ed25519' })
     }
@@ -54,7 +54,7 @@ export function startArchiver(options: ArchiverOptions): ArchiverResult {
     return signer
   }
 
-  async function lockThread(commentCid: string, signer: any, reason: string): Promise<void> {
+  async function lockThread(commentCid: string, signer: Signer, reason: string): Promise<void> {
     log(`locking thread ${commentCid} (${reason})`)
     const mod = await plebbit.createCommentModeration({
       commentCid,
@@ -67,7 +67,7 @@ export function startArchiver(options: ArchiverOptions): ArchiverResult {
     saveState(statePath, state)
   }
 
-  async function purgeThread(commentCid: string, signer: any): Promise<void> {
+  async function purgeThread(commentCid: string, signer: Signer): Promise<void> {
     log(`purging thread ${commentCid}`)
     const mod = await plebbit.createCommentModeration({
       commentCid,
@@ -80,21 +80,38 @@ export function startArchiver(options: ArchiverOptions): ArchiverResult {
     saveState(statePath, state)
   }
 
-  async function handleUpdate(subplebbit: any, signer: any): Promise<void> {
+  async function handleUpdate(subplebbit: Subplebbit, signer: Signer): Promise<void> {
     if (stopped) return
 
-    // Build thread list from pages
-    const threads: any[] = []
-    // TODO: walk subplebbit.posts.pageCids.active or calculate from subplebbit.posts.pages.hot
-    // For now, use preloaded hot page if available
-    if (subplebbit.posts?.pages?.hot?.comments) {
-      threads.push(...subplebbit.posts.pages.hot.comments)
+    // Scenario 3: no posts at all — nothing to archive.
+    if (!subplebbit.posts.pageCids.active && !subplebbit.posts.pages.hot) {
+      return
     }
 
-    // TODO: paginate via nextCid to get all threads
+    // Build full thread list from active sort pages.
+    // The subplebbit IPFS record is capped at 1MB total. subplebbit.posts.pages.hot
+    // is preloaded into whatever space remains. If all posts fit, there's no nextCid.
+    // If they don't fit, nextCid points to additional pages to fetch.
+    const threads: ThreadComment[] = []
+
+    if (subplebbit.posts.pageCids.active) {
+      // Scenario 1: pageCids.active exists — fetch active-sorted pages
+      let page: Page = await subplebbit.posts.getPage({ cid: subplebbit.posts.pageCids.active })
+      threads.push(...page.comments)
+      while (page.nextCid) {
+        page = await subplebbit.posts.getPage({ cid: page.nextCid })
+        threads.push(...page.comments)
+      }
+    } else {
+      // Scenario 2: only preloaded hot page available
+      // TODO: calculate active sort from subplebbit.posts.pages.hot using plebbit-js activeScore
+      if (subplebbit.posts.pages.hot?.comments) {
+        threads.push(...subplebbit.posts.pages.hot.comments)
+      }
+    }
 
     // Filter out pinned threads
-    const nonPinned = threads.filter((t: any) => !t.pinned)
+    const nonPinned = threads.filter((t: ThreadComment) => !t.pinned)
 
     // Lock threads beyond capacity
     for (const thread of nonPinned.slice(maxThreads)) {
@@ -134,7 +151,7 @@ export function startArchiver(options: ArchiverOptions): ArchiverResult {
   }
 
   // Main startup
-  let subplebbit: any
+  let subplebbit: Subplebbit
   const updateHandler = () => {
     getOrCreateSigner().then((signer) => handleUpdate(subplebbit, signer)).catch((err) => {
       log.error(`update handler error: ${err}`)

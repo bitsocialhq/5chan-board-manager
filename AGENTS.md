@@ -1,3 +1,4 @@
 - posts are the equivalent plebbit-js term for "board" in 5chan
 - Subplebbits are equivalent to community, which are essentially the same as boards in 5chan
 - Every new feature or bug fix must include a test case that reproduces/covers it
+- Never use `any` — always use proper types

@@ -185,6 +185,16 @@ Cannot do `subplebbit.posts.getPage("active")`. Must either:
 1. Use `subplebbit.posts.pageCids.active` to get the CID, then fetch that page
 2. Or calculate active sorting from preloaded pages at `subplebbit.posts.pages.hot` using imported `activeScore` rank function from plebbit-js
 
+### Subplebbit record size constraint
+
+The entire subplebbit IPFS record is capped at 1MB (`MAX_FILE_SIZE_BYTES_FOR_SUBPLEBBIT_IPFS`). `subplebbit.posts.pages.hot` is preloaded into the record with whatever space remains after the rest of the record (title, description, roles, challenges, etc.).
+
+- If the preloaded page has **no `nextCid`**, it contains all posts — no pagination needed
+- If `nextCid` **is present**, additional pages must be fetched via `subplebbit.posts.getPage({ cid: nextCid })`
+- `subplebbit.posts.pageCids.active` provides the CID of the first active-sorted page, which is the sort order the archiver needs
+
+Reference: `plebbit-js/src/subplebbit/subplebbit-client-manager.ts:38`, `plebbit-js/src/runtime/node/subplebbit/local-subplebbit.ts:714`
+
 ### Feature 1: Thread limit / auto-archive
 
 - After each subplebbit update, determine thread positions in active sort
@@ -213,8 +223,10 @@ Cannot do `subplebbit.posts.getPage("active")`. Must either:
 4. Check subplebbit.roles for signer address; if missing, subplebbit.edit() to add as mod
 5. Call subplebbit.update()
 6. On each 'update' event:
-   a. Get active sort from subplebbit.posts.pageCids.active
-      or calculate from subplebbit.posts.pages.hot using activeScore
+   a. Determine thread source (three scenarios):
+      1. pageCids.active exists → fetch via getPage(), paginate via nextCid
+      2. Only pages.hot exists → use preloaded page (TODO: calculate active sort)
+      3. Neither exists → no posts, return early
    b. Walk through pages to build full ordered list of threads
    c. Filter out pinned threads
    d. For each non-pinned thread beyond position (per_page * pages):

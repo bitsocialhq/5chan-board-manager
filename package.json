@@ -1,0 +1,31 @@
+{
+  "name": "5chan-board-archiver",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "bin": {
+    "5chan-archiver": "dist/cli.js"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "start": "node --env-file=.env dist/cli.js"
+  },
+  "dependencies": {
+    "@plebbit/plebbit-js": "https://github.com/plebbit/plebbit-js"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.18"
+  }
+}

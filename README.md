@@ -1,6 +1,109 @@
 # Plebbit Auto-Archiving Module
 
-An external module for plebbit-js subplebbits that implements 4chan-style thread auto-archiving and purging. Uses plebbit-js's public API (`plebbit.createCommentModeration()`) — **no plebbit-js modifications required**.
+An ESM TypeScript npm package that implements 4chan-style thread auto-archiving and purging for plebbit-js subplebbits. Uses plebbit-js's public API (`plebbit.createCommentModeration()`) — **no plebbit-js modifications required**.
+
+Works two ways:
+1. **Library** — imported by 5chan (web UI) as a dependency
+2. **CLI** — `node dist/cli.js <subplebbit-address> [--flags]`
+
+## Library API
+
+```ts
+import { startArchiver } from '5chan-board-archiver'
+
+const archiver = startArchiver({
+  subplebbitAddress: 'my-board.eth',
+  plebbit,        // Plebbit instance from caller (with moderator signer)
+  perPage: 15,    // optional, default 15
+  pages: 10,      // optional, default 10
+  bumpLimit: 300, // optional, default 300
+  archivePurgeSeconds: 172800, // optional, default 172800 (48h)
+})
+
+// Later, to stop:
+archiver.stop()
+```
+
+- `plebbit` is a Plebbit instance from the caller
+- Returns `{ stop(): void }` — stops the archiver and cleans up event listeners
+
+## CLI Usage
+
+```bash
+node --env-file=.env dist/cli.js <subplebbit-address> [--per-page 15] [--pages 10] [--bump-limit 300] [--archive-purge-seconds 172800]
+```
+
+- Uses Node 22's built-in `--env-file` flag (no dotenv dependency)
+- CLI flags override `.env` values
+- `<subplebbit-address>` is a required positional argument
+
+Or via npm script:
+
+```bash
+npm start -- <subplebbit-address> [--flags]
+```
+
+## .env Configuration
+
+```env
+PLEBBIT_DATA_PATH=...
+PER_PAGE=15
+PAGES=10
+BUMP_LIMIT=300
+ARCHIVE_PURGE_SECONDS=172800
+```
+
+No mod private key in `.env` — signers are auto-managed in the state JSON per subplebbit (see below).
+
+## Auto Mod Signer Management
+
+On startup for each subplebbit:
+
+1. Check state JSON for a signer private key for this subplebbit address
+2. If none exists, create one via `await plebbit.createSigner()` and save to state JSON
+3. Check `subplebbit.roles` for the signer's address
+4. If not a mod, auto-add via `subplebbit.edit()` (works because we run on LocalSubplebbit or RpcLocalSubplebbit — we own the sub)
+
+Logged via `plebbit-logger` when creating signer or adding mod role.
+
+## State Persistence
+
+`lockedAt` is not in plebbit-js's schema, so the script persists state to a JSON file in the plebbit data path.
+
+```json
+{
+  "signers": {
+    "<subplebbitAddress>": { "privateKey": "..." }
+  },
+  "lockedThreads": {
+    "<commentCid>": { "lockTimestamp": 1234567890 }
+  }
+}
+```
+
+- **`signers`**: maps subplebbit address → mod signer private key (auto-created if missing)
+- **`lockedThreads`**: maps comment CID → lock metadata
+- Top-level object allows adding future state categories
+- Per-entry objects allow adding future metadata
+- Loaded on startup, written on lock, entries removed on purge
+
+## Cold Start
+
+The script may start long after the board has been running. On first run, many threads may need locking/purging at once. No rate limiting is needed — same-node publishing has no pubsub overhead. The first cycle may be heavier; steady-state handles a few threads per update.
+
+## Idempotency
+
+Before locking, checks the thread's `locked` property. Skips if already locked (plebbit-js throws on duplicate moderation actions).
+
+## Logging
+
+Uses `plebbit-logger` (same logger as the plebbit-js ecosystem). Key events logged:
+
+- Archiver start/stop
+- Threads locked (with CID and reason: capacity vs bump limit)
+- Threads purged
+- Mod role auto-added
+- Errors
 
 ## 4chan Board Behavior Reference
 
@@ -33,10 +136,6 @@ Configurable per board (300–500+). After N replies, new replies no longer bump
 
 Examples: /b/ = 300, /3/ = 310, /v/ = 500.
 
-### Sage
-
-Posting with "sage" in the options field doesn't bump the thread and doesn't count toward the bump limit.
-
 ### Pinned (sticky) threads
 
 Sit at top of page 1, exempt from thread limit and archiving. "Pinned" and "sticky" are the same thing.
@@ -55,7 +154,7 @@ External services (archive.4plebs.org, desuarchive.org) independently scrape and
 
 `image_limit`, `max_filesize`, `max_comment_chars`, `cooldowns`, `spoilers`, `country_flags`, `user_ids`, `forced_anon`, etc.
 
-## Plebbit-js Implementation Plan
+## Plebbit-js Implementation
 
 ### Architecture
 
@@ -108,19 +207,27 @@ Cannot do `subplebbit.posts.getPage("active")`. Must either:
 ### Module flow
 
 ```
-1. Create plebbit instance with moderator signer
-2. Get subplebbit and call subplebbit.update()
-3. On each 'update' event:
+1. Create/get plebbit instance
+2. Load state JSON; get or create signer for this subplebbit via plebbit.createSigner()
+3. Get subplebbit (LocalSubplebbit or RpcLocalSubplebbit)
+4. Check subplebbit.roles for signer address; if missing, subplebbit.edit() to add as mod
+5. Call subplebbit.update()
+6. On each 'update' event:
    a. Get active sort from subplebbit.posts.pageCids.active
       or calculate from subplebbit.posts.pages.hot using activeScore
    b. Walk through pages to build full ordered list of threads
    c. Filter out pinned threads
    d. For each non-pinned thread beyond position (per_page * pages):
+      - Skip if already locked
       - createCommentModeration({ locked: true }) and publish
+      - Record lockTimestamp in state file
    e. For each thread with replyCount >= bump_limit:
+      - Skip if already locked
       - createCommentModeration({ locked: true }) and publish
+      - Record lockTimestamp in state file
    f. For each locked thread where (now - lockedAt) > archive_purge_seconds:
       - createCommentModeration({ purged: true }) and publish
+      - Remove from state file
 ```
 
 ### Key plebbit-js APIs used

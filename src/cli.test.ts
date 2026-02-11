@@ -22,9 +22,9 @@ describe('parseCliConfig', () => {
     expect(config.rpcUrl).toBe('ws://cli:9138')
   })
 
-  it('rpcUrl is undefined when neither flag nor env var is set', () => {
+  it('defaults rpcUrl to ws://localhost:9138 when neither flag nor env var is set', () => {
     const config = parseCliConfig(['board.eth'], emptyEnv)
-    expect(config.rpcUrl).toBeUndefined()
+    expect(config.rpcUrl).toBe('ws://localhost:9138')
   })
 
   it('resolves subplebbitAddress from first positional', () => {

@@ -11,11 +11,6 @@ if (!config.subplebbitAddress) {
   process.exit(1)
 }
 
-if (!config.rpcUrl) {
-  console.error('Error: PLEBBIT_RPC_WS_URL is required (set via --rpc-url or PLEBBIT_RPC_WS_URL env var)')
-  process.exit(1)
-}
-
 const plebbit = await Plebbit({
   plebbitRpcClientsOptions: [config.rpcUrl],
 })

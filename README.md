@@ -158,6 +158,14 @@ External services (archive.4plebs.org, desuarchive.org) independently scrape and
 
 `image_limit`, `max_filesize`, `max_comment_chars`, `cooldowns`, `spoilers`, `country_flags`, `user_ids`, `forced_anon`, etc.
 
+## Differences from 4chan
+
+| Behavior | 4chan | This module |
+|----------|------|-------------|
+| **Bump limit** | Threads past bump limit still accept replies — they just stop rising in the catalog | Threads are **locked** (no more replies) because plebbit-js has no "stop bumping without locking" mechanism |
+| **Sage** | Replying with `sage` in the email field prevents the thread from being bumped | Not supported — plebbit has no equivalent mechanism, so all replies bump the thread |
+| **Image limit** | Per-thread image limit (e.g., 150 images on /b/) after which no more images can be posted | Not implemented — plebbit-js has its own file-size constraints but no per-thread image count limit |
+
 ## Plebbit-js Implementation
 
 ### Architecture
@@ -210,8 +218,6 @@ Reference: `plebbit-js/src/subplebbit/subplebbit-client-manager.ts:38`, `plebbit
 
 - Track reply counts for active threads
 - When a thread reaches `bump_limit` replies → lock it via `createCommentModeration({ commentModeration: { locked: true } })`
-
-**Difference from 4chan behavior:** On 4chan, threads past bump limit still accept replies but just don't get bumped in sort order. True bump-limit-without-locking would require a plebbit-js change to the active sort CTE query (ignoring replies after the Nth for sort calculation). Locking is a simpler approximation.
 
 ### Feature 3: Delayed purge
 

@@ -37,12 +37,12 @@ export interface ArchivedThread {
   archivedTimestamp: number
 }
 
-export interface ArchiverLock {
-  pid: number
+export interface FileLock {
+  lockPath: string
+  release: () => void
 }
 
 export interface ArchiverState {
   signers: Record<string, SignerState>
   archivedThreads: Record<string, ArchivedThread>
-  lock?: ArchiverLock
 }

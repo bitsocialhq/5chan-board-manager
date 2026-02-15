@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, existsSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { loadState, saveState, isPidAlive } from './state.js'
+import { loadState, saveState } from './state.js'
 import type { ArchiverState, PlebbitInstance, Page, ThreadComment } from './types.js'
 import Plebbit from '@plebbit/plebbit-js'
 import { startArchiver } from './archiver.js'
@@ -750,13 +750,9 @@ describe('archiver logic', () => {
 
   describe('process lock', () => {
     it('throws when lock is held by a live PID', async () => {
-      const statePath = join(stateDir, 'board.eth.json')
-      const state: ArchiverState = {
-        signers: {},
-        archivedThreads: {},
-        lock: { pid: process.pid },
-      }
-      saveState(statePath, state)
+      mkdirSync(stateDir, { recursive: true })
+      const lockPath = join(stateDir, 'board.eth.json.lock')
+      writeFileSync(lockPath, String(process.pid))
 
       const { instance } = createMockPlebbit()
       const mockSub = createMockSubplebbit({ pageCids: {}, pages: {} })
@@ -770,13 +766,9 @@ describe('archiver logic', () => {
     })
 
     it('succeeds when lock has stale PID', async () => {
-      const statePath = join(stateDir, 'board.eth.json')
-      const state: ArchiverState = {
-        signers: {},
-        archivedThreads: {},
-        lock: { pid: 999999 },
-      }
-      saveState(statePath, state)
+      mkdirSync(stateDir, { recursive: true })
+      const lockPath = join(stateDir, 'board.eth.json.lock')
+      writeFileSync(lockPath, '999999')
 
       const { instance } = createMockPlebbit()
       const mockSub = createMockSubplebbit({ pageCids: {}, pages: {} })
@@ -788,8 +780,7 @@ describe('archiver logic', () => {
         stateDir,
       })
 
-      const loaded = loadState(statePath)
-      expect(loaded.lock).toEqual({ pid: process.pid })
+      expect(existsSync(lockPath)).toBe(true)
       await archiver.stop()
     })
 
@@ -804,14 +795,12 @@ describe('archiver logic', () => {
         stateDir,
       })
 
-      const statePath = join(stateDir, 'board.eth.json')
-      const beforeStop = loadState(statePath)
-      expect(beforeStop.lock).toEqual({ pid: process.pid })
+      const lockPath = join(stateDir, 'board.eth.json.lock')
+      expect(existsSync(lockPath)).toBe(true)
 
       await archiver.stop()
 
-      const afterStop = loadState(statePath)
-      expect(afterStop.lock).toBeUndefined()
+      expect(existsSync(lockPath)).toBe(false)
     })
 
     it('can start again after stop()', async () => {
@@ -819,12 +808,16 @@ describe('archiver logic', () => {
       const mockSub = createMockSubplebbit({ pageCids: {}, pages: {} })
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
+      const lockPath = join(stateDir, 'board.eth.json.lock')
+
       const archiver1 = await startArchiver({
         subplebbitAddress: 'board.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
       })
+      expect(existsSync(lockPath)).toBe(true)
       await archiver1.stop()
+      expect(existsSync(lockPath)).toBe(false)
 
       // Re-mock Plebbit for second call since mock is consumed
       const { instance: instance2 } = createMockPlebbit()
@@ -836,19 +829,9 @@ describe('archiver logic', () => {
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
       })
-
-      const statePath = join(stateDir, 'board.eth.json')
-      const loaded = loadState(statePath)
-      expect(loaded.lock).toEqual({ pid: process.pid })
+      expect(existsSync(lockPath)).toBe(true)
       await archiver2.stop()
-    })
-
-    it('isPidAlive returns true for current process', () => {
-      expect(isPidAlive(process.pid)).toBe(true)
-    })
-
-    it('isPidAlive returns false for dead PID', () => {
-      expect(isPidAlive(999999)).toBe(false)
+      expect(existsSync(lockPath)).toBe(false)
     })
   })
 

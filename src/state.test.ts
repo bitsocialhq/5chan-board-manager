@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs'
+import { mkdtempSync, rmSync, readFileSync, existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { loadState, saveState, defaultStateDir } from './state.js'
+import { loadState, saveState, defaultStateDir, isPidAlive, acquireLock } from './state.js'
 import type { ArchiverState } from './types.js'
 
 describe('state', () => {
@@ -96,6 +96,97 @@ describe('state', () => {
       expect(existsSync(nestedPath)).toBe(true)
       const loaded = loadState(nestedPath)
       expect(loaded).toEqual(state)
+    })
+  })
+
+  describe('saveState atomic write', () => {
+    it('does not leave a .tmp file after successful write', () => {
+      const state: ArchiverState = { signers: {}, archivedThreads: {} }
+      saveState(statePath, state)
+      expect(existsSync(statePath + '.tmp')).toBe(false)
+      expect(existsSync(statePath)).toBe(true)
+    })
+
+    it('preserves original state when a leftover .tmp file exists', () => {
+      const state: ArchiverState = {
+        signers: { 'x.eth': { privateKey: 'original' } },
+        archivedThreads: {},
+      }
+      saveState(statePath, state)
+
+      // Simulate a leftover .tmp from a crashed write
+      writeFileSync(statePath + '.tmp', 'garbage')
+
+      const loaded = loadState(statePath)
+      expect(loaded.signers['x.eth'].privateKey).toBe('original')
+    })
+
+    it('overwrites leftover .tmp on next successful save', () => {
+      writeFileSync(statePath + '.tmp', 'garbage')
+
+      const state: ArchiverState = { signers: {}, archivedThreads: {} }
+      saveState(statePath, state)
+
+      expect(existsSync(statePath + '.tmp')).toBe(false)
+      expect(loadState(statePath)).toEqual(state)
+    })
+  })
+
+  describe('isPidAlive', () => {
+    it('returns true for current process', () => {
+      expect(isPidAlive(process.pid)).toBe(true)
+    })
+
+    it('returns false for dead PID', () => {
+      expect(isPidAlive(999999)).toBe(false)
+    })
+  })
+
+  describe('acquireLock', () => {
+    it('creates .lock file with current PID', () => {
+      const lock = acquireLock(statePath)
+      expect(existsSync(statePath + '.lock')).toBe(true)
+      const pid = readFileSync(statePath + '.lock', 'utf-8').trim()
+      expect(Number(pid)).toBe(process.pid)
+      lock.release()
+    })
+
+    it('throws when live process holds lock', () => {
+      const lock = acquireLock(statePath)
+      expect(() => acquireLock(statePath)).toThrow(
+        `Another archiver (PID ${process.pid}) is already running`
+      )
+      lock.release()
+    })
+
+    it('recovers stale lock from dead PID', () => {
+      writeFileSync(statePath + '.lock', '999999')
+      const lock = acquireLock(statePath)
+      const pid = readFileSync(statePath + '.lock', 'utf-8').trim()
+      expect(Number(pid)).toBe(process.pid)
+      lock.release()
+    })
+
+    it('release() removes .lock file', () => {
+      const lock = acquireLock(statePath)
+      expect(existsSync(statePath + '.lock')).toBe(true)
+      lock.release()
+      expect(existsSync(statePath + '.lock')).toBe(false)
+    })
+
+    it('can re-acquire after release', () => {
+      const lock1 = acquireLock(statePath)
+      lock1.release()
+      const lock2 = acquireLock(statePath)
+      expect(existsSync(statePath + '.lock')).toBe(true)
+      lock2.release()
+    })
+
+    it('auto-creates parent directories', () => {
+      const nestedPath = join(dir, 'a', 'b', 'c', 'state.json')
+      const lock = acquireLock(nestedPath)
+      expect(existsSync(nestedPath + '.lock')).toBe(true)
+      lock.release()
     })
   })
 

@@ -51,7 +51,7 @@ jobs:
           npm cache ls 2>/dev/null | head -20 || echo "no cache or not supported"
           echo "--- resolved git deps in lockfile ---"
           grep -n 'git+ssh\|git+https' package-lock.json || echo "none found"
-      - name: npm ci (verbose)
-        run: npm ci --loglevel verbose
+      - name: npm install
+        run: npm install
       - run: npx tsc --noEmit
       - run: npm test

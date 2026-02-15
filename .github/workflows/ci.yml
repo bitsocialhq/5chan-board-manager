@@ -30,6 +30,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     timeout-minutes: 20
+    env:
+      GIT_TERMINAL_PROMPT: "0"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,22 +40,7 @@ jobs:
           cache: 'npm'
       - name: Force git to use HTTPS instead of SSH
         run: git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
-      - name: Debug environment
-        shell: bash
-        run: |
-          echo "OS: ${{ matrix.os }}"
-          echo "Node: $(node --version)"
-          echo "npm: $(npm --version)"
-          echo "git: $(git --version)"
-          echo "--- git config ---"
-          git config --global --list || true
-          echo "--- ssh available ---"
-          which ssh || echo "ssh not found"
-          echo "--- npm cache ---"
-          npm cache ls 2>/dev/null | head -20 || echo "no cache or not supported"
-          echo "--- resolved git deps in lockfile ---"
-          grep -n 'git+ssh\|git+https' package-lock.json || echo "none found"
       - name: Install dependencies
-        run: npm ci --loglevel verbose
+        run: npm ci --foreground-scripts --loglevel verbose
       - run: npx tsc --noEmit
       - run: npm test

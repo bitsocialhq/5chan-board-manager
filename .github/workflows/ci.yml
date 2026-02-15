@@ -36,6 +36,22 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
-      - run: npm ci
+      - name: Debug environment
+        shell: bash
+        run: |
+          echo "OS: ${{ matrix.os }}"
+          echo "Node: $(node --version)"
+          echo "npm: $(npm --version)"
+          echo "git: $(git --version)"
+          echo "--- git config ---"
+          git config --global --list || true
+          echo "--- ssh available ---"
+          which ssh || echo "ssh not found"
+          echo "--- npm cache ---"
+          npm cache ls 2>/dev/null | head -20 || echo "no cache or not supported"
+          echo "--- resolved git deps in lockfile ---"
+          grep -n 'git+ssh\|git+https' package-lock.json || echo "none found"
+      - name: npm ci (verbose)
+        run: npm ci --loglevel verbose
       - run: npx tsc --noEmit
       - run: npm test

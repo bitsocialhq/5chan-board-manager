@@ -9,6 +9,9 @@ export type Subplebbit = Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>
 /** Signer returned by `plebbit.createSigner()` */
 export type Signer = Awaited<ReturnType<PlebbitInstance['createSigner']>>
 
+/** Comment returned by `plebbit.getComment()` */
+export type Comment = Awaited<ReturnType<PlebbitInstance['getComment']>>
+
 /** A single page returned by `subplebbit.posts.getPage()` */
 export type Page = Awaited<ReturnType<Subplebbit['posts']['getPage']>>
 
@@ -45,4 +48,5 @@ export interface FileLock {
 export interface ArchiverState {
   signers: Record<string, SignerState>
   archivedThreads: Record<string, ArchivedThread>
+  purgedDeletedComments: Record<string, true>
 }

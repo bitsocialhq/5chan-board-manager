@@ -2,7 +2,7 @@ import Plebbit from '@plebbit/plebbit-js'
 import Logger from '@plebbit/plebbit-logger'
 import { join } from 'node:path'
 import { loadState, saveState, defaultStateDir, acquireLock } from './state.js'
-import type { ArchiverOptions, ArchiverResult, ArchiverState, FileLock, Subplebbit, Signer, ThreadComment, Page } from './types.js'
+import type { ArchiverOptions, ArchiverResult, ArchiverState, Comment, FileLock, Subplebbit, Signer, ThreadComment, Page } from './types.js'
 
 const log = Logger('5chan-archiver')
 
@@ -98,6 +98,93 @@ export async function startArchiver(options: ArchiverOptions): Promise<ArchiverR
     saveState(statePath, state)
   }
 
+  async function purgeDeletedComment(commentCid: string, signer: Signer): Promise<void> {
+    log(`purging author-deleted comment ${commentCid}`)
+    const mod = await plebbit.createCommentModeration({
+      commentCid,
+      commentModeration: { purged: true },
+      subplebbitAddress,
+      signer,
+    })
+    await mod.publish()
+    if (state.archivedThreads[commentCid]) {
+      delete state.archivedThreads[commentCid]
+    }
+    state.purgedDeletedComments[commentCid] = true
+    saveState(statePath, state)
+  }
+
+  async function findDeletedReplies(thread: ThreadComment): Promise<string[]> {
+    const deletedCids: string[] = []
+    const visited = new Set<string>()
+    const queue: Array<{ pageCid: string; parentCid: string }> = []
+    const commentCache = new Map<string, Comment>()
+
+    async function getCommentInstance(cid: string): Promise<Comment> {
+      let instance = commentCache.get(cid)
+      if (!instance) {
+        instance = await plebbit.getComment({ cid })
+        commentCache.set(cid, instance)
+      }
+      return instance
+    }
+
+    function enqueue(pageCid: string | undefined, parentCid: string): void {
+      if (!pageCid) return
+      const key = `${parentCid}:${pageCid}`
+      if (visited.has(key)) return
+      visited.add(key)
+      queue.push({ pageCid, parentCid })
+    }
+
+    function processComments(comments: ThreadComment[]): void {
+      for (const comment of comments) {
+        if (comment.deleted && !state.purgedDeletedComments[comment.cid]) {
+          deletedCids.push(comment.cid)
+        }
+        if (comment.replies?.pages) {
+          for (const page of Object.values(comment.replies.pages)) {
+            if (!page) continue
+            processComments(page.comments)
+            enqueue(page.nextCid, comment.cid)
+          }
+        }
+        if (comment.replies?.pageCids) {
+          for (const pageCid of Object.values(comment.replies.pageCids)) {
+            enqueue(pageCid, comment.cid)
+          }
+        }
+      }
+    }
+
+    if (thread.replies?.pages) {
+      for (const page of Object.values(thread.replies.pages)) {
+        if (!page) continue
+        processComments(page.comments)
+        enqueue(page.nextCid, thread.cid)
+      }
+    }
+    if (thread.replies?.pageCids) {
+      for (const pageCid of Object.values(thread.replies.pageCids)) {
+        enqueue(pageCid, thread.cid)
+      }
+    }
+
+    while (queue.length > 0) {
+      const { pageCid, parentCid } = queue.shift()!
+      try {
+        const parentComment = await getCommentInstance(parentCid)
+        const page = await parentComment.replies.getPage({ cid: pageCid })
+        processComments(page.comments)
+        enqueue(page.nextCid, parentCid)
+      } catch (err) {
+        log.error(`failed to fetch reply page ${pageCid} for comment ${parentCid}: ${err}`)
+      }
+    }
+
+    return deletedCids
+  }
+
   async function handleUpdate(subplebbit: Subplebbit, signer: Signer): Promise<void> {
     if (stopped) return
 
@@ -172,6 +259,32 @@ export async function startArchiver(options: ArchiverOptions): Promise<ArchiverR
           await purgeThread(cid, signer)
         } catch (err) {
           log.error(`failed to purge thread ${cid}: ${err}`)
+        }
+      }
+    }
+
+    // Purge author-deleted threads and replies
+    for (const thread of threads) {
+      if (thread.deleted && !state.purgedDeletedComments[thread.cid]) {
+        try {
+          await purgeDeletedComment(thread.cid, signer)
+        } catch (err) {
+          log.error(`failed to purge deleted thread ${thread.cid}: ${err}`)
+        }
+      }
+
+      if (thread.replies) {
+        try {
+          const deletedReplyCids = await findDeletedReplies(thread)
+          for (const cid of deletedReplyCids) {
+            try {
+              await purgeDeletedComment(cid, signer)
+            } catch (err) {
+              log.error(`failed to purge deleted reply ${cid}: ${err}`)
+            }
+          }
+        } catch (err) {
+          log.error(`failed to scan replies for thread ${thread.cid}: ${err}`)
         }
       }
     }

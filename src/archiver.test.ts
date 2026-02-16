@@ -92,7 +92,7 @@ describe('archiver logic', () => {
   describe('state-based thread tracking', () => {
     it('records archivedTimestamp when adding an archived thread', () => {
       const filePath = join(stateDir, 'test.json')
-      const state: ArchiverState = { signers: {}, archivedThreads: {} }
+      const state: ArchiverState = { signers: {}, archivedThreads: {}, purgedDeletedComments: {} }
       const now = Math.floor(Date.now() / 1000)
       state.archivedThreads['QmTest'] = { archivedTimestamp: now }
       saveState(filePath, state)
@@ -109,6 +109,7 @@ describe('archiver logic', () => {
           'QmKeep': { archivedTimestamp: 1000 },
           'QmPurge': { archivedTimestamp: 500 },
         },
+        purgedDeletedComments: {},
       }
       delete state.archivedThreads['QmPurge']
       saveState(filePath, state)
@@ -230,6 +231,7 @@ describe('archiver logic', () => {
           'QmRecent': { archivedTimestamp: now - 1000 }, // < 48h ago
           'QmExact': { archivedTimestamp: now - 172800 }, // exactly 48h ago
         },
+        purgedDeletedComments: {},
       }
 
       const toPurge = Object.entries(state.archivedThreads)
@@ -247,6 +249,7 @@ describe('archiver logic', () => {
           'Qm1': { archivedTimestamp: now - 100 },
           'Qm2': { archivedTimestamp: now },
         },
+        purgedDeletedComments: {},
       }
 
       const toPurge = Object.entries(state.archivedThreads)
@@ -258,7 +261,7 @@ describe('archiver logic', () => {
   describe('signer management', () => {
     it('persists signer to state file', () => {
       const filePath = join(stateDir, 'test.json')
-      const state: ArchiverState = { signers: {}, archivedThreads: {} }
+      const state: ArchiverState = { signers: {}, archivedThreads: {}, purgedDeletedComments: {} }
       state.signers['my-board.eth'] = { privateKey: 'test-private-key' }
       saveState(filePath, state)
 
@@ -271,6 +274,7 @@ describe('archiver logic', () => {
       const state: ArchiverState = {
         signers: { 'board.eth': { privateKey: 'existing-key' } },
         archivedThreads: {},
+        purgedDeletedComments: {},
       }
       saveState(filePath, state)
 
@@ -287,6 +291,7 @@ describe('archiver logic', () => {
           'board2.eth': { privateKey: 'key2' },
         },
         archivedThreads: {},
+        purgedDeletedComments: {},
       }
       saveState(filePath, state)
 
@@ -302,6 +307,7 @@ describe('archiver logic', () => {
       const state: ArchiverState = {
         signers: {},
         archivedThreads: { 'QmAlready': { archivedTimestamp: 1000 } },
+        purgedDeletedComments: {},
       }
       const threads = [mockThread('QmAlready'), mockThread('QmNew')]
       const maxThreads = 0 // all beyond capacity
@@ -832,6 +838,254 @@ describe('archiver logic', () => {
       expect(existsSync(lockPath)).toBe(true)
       await archiver2.stop()
       expect(existsSync(lockPath)).toBe(false)
+    })
+  })
+
+  describe('deleted comment purging', () => {
+    it('purges a deleted top-level thread', async () => {
+      const { instance, publishedModerations } = createMockPlebbit()
+      const threads = [
+        mockThread('QmNormal', { deleted: false }),
+        mockThread('QmDeleted', { deleted: true }),
+      ]
+      const getPage = vi.fn().mockResolvedValue({
+        comments: threads,
+        nextCid: undefined,
+      } as Page)
+
+      const mockSub = createMockSubplebbit({
+        pageCids: { active: 'QmPage1' },
+        pages: {},
+        getPage,
+      })
+      vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
+
+      const archiver = await startArchiver({
+        subplebbitAddress: 'board.eth',
+        plebbitRpcUrl: 'ws://localhost:9138',
+        stateDir,
+        perPage: 15,
+        pages: 10,
+      })
+
+      await vi.waitFor(() => {
+        const purges = publishedModerations.filter((m) => m.commentModeration.purged === true)
+        expect(purges).toHaveLength(1)
+      })
+
+      const purges = publishedModerations.filter((m) => m.commentModeration.purged === true)
+      expect(purges[0].commentCid).toBe('QmDeleted')
+      expect(purges[0].subplebbitAddress).toBe('board.eth')
+      expect(purges[0].signer).toBeDefined()
+      expect(purges[0].commentModeration).toEqual({ purged: true })
+
+      // Verify createCommentModeration was called with correct purge args
+      expect(instance.createCommentModeration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          commentCid: 'QmDeleted',
+          commentModeration: { purged: true },
+          subplebbitAddress: 'board.eth',
+        })
+      )
+      await archiver.stop()
+    })
+
+    it('purges a deleted reply in preloaded replies.pages', async () => {
+      const { instance, publishedModerations } = createMockPlebbit()
+      const threads = [
+        mockThread('QmThread1', {
+          replies: {
+            pages: {
+              newFlat: {
+                comments: [
+                  mockThread('QmReply1', { deleted: false }),
+                  mockThread('QmReply2', { deleted: true }),
+                ],
+                nextCid: undefined,
+              },
+            },
+            pageCids: {},
+          },
+        }),
+      ]
+      const getPage = vi.fn().mockResolvedValue({
+        comments: threads,
+        nextCid: undefined,
+      } as Page)
+
+      const mockSub = createMockSubplebbit({
+        pageCids: { active: 'QmPage1' },
+        pages: {},
+        getPage,
+      })
+      vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
+
+      const archiver = await startArchiver({
+        subplebbitAddress: 'board.eth',
+        plebbitRpcUrl: 'ws://localhost:9138',
+        stateDir,
+        perPage: 15,
+        pages: 10,
+      })
+
+      await vi.waitFor(() => {
+        const purges = publishedModerations.filter((m) => m.commentModeration.purged === true)
+        expect(purges).toHaveLength(1)
+      })
+
+      const purges = publishedModerations.filter((m) => m.commentModeration.purged === true)
+      expect(purges[0].commentCid).toBe('QmReply2')
+      expect(purges[0].subplebbitAddress).toBe('board.eth')
+      expect(purges[0].signer).toBeDefined()
+      expect(purges[0].commentModeration).toEqual({ purged: true })
+      await archiver.stop()
+    })
+
+    it('skips already-purged deleted comments (idempotency)', async () => {
+      const { instance, publishedModerations } = createMockPlebbit()
+      const threads = [
+        mockThread('QmDeleted', { deleted: true }),
+      ]
+      const getPage = vi.fn().mockResolvedValue({
+        comments: threads,
+        nextCid: undefined,
+      } as Page)
+
+      const mockSub = createMockSubplebbit({
+        pageCids: { active: 'QmPage1' },
+        pages: {},
+        getPage,
+      })
+      vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
+
+      // Pre-seed state with already-purged comment
+      const statePath = join(stateDir, 'board.eth.json')
+      saveState(statePath, {
+        signers: {},
+        archivedThreads: {},
+        purgedDeletedComments: { 'QmDeleted': true },
+      })
+
+      const archiver = await startArchiver({
+        subplebbitAddress: 'board.eth',
+        plebbitRpcUrl: 'ws://localhost:9138',
+        stateDir,
+        perPage: 15,
+        pages: 10,
+      })
+
+      // Wait for update to process
+      await new Promise((r) => setTimeout(r, 100))
+
+      const purges = publishedModerations.filter((m) => m.commentModeration.purged === true)
+      expect(purges).toHaveLength(0)
+      await archiver.stop()
+    })
+
+    it('cleans up archivedThreads when deleted thread is purged', async () => {
+      const { instance, publishedModerations } = createMockPlebbit()
+      const threads = [
+        mockThread('QmArchived', { deleted: true }),
+      ]
+      const getPage = vi.fn().mockResolvedValue({
+        comments: threads,
+        nextCid: undefined,
+      } as Page)
+
+      const mockSub = createMockSubplebbit({
+        pageCids: { active: 'QmPage1' },
+        pages: {},
+        getPage,
+      })
+      vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
+
+      // Pre-seed state with thread in archivedThreads (recent timestamp to avoid archive-purge)
+      const statePath = join(stateDir, 'board.eth.json')
+      saveState(statePath, {
+        signers: {},
+        archivedThreads: { 'QmArchived': { archivedTimestamp: Math.floor(Date.now() / 1000) } },
+        purgedDeletedComments: {},
+      })
+
+      const archiver = await startArchiver({
+        subplebbitAddress: 'board.eth',
+        plebbitRpcUrl: 'ws://localhost:9138',
+        stateDir,
+        perPage: 15,
+        pages: 10,
+      })
+
+      await vi.waitFor(() => {
+        const purges = publishedModerations.filter((m) => m.commentModeration.purged === true)
+        expect(purges).toHaveLength(1)
+      })
+
+      const loaded = loadState(statePath)
+      expect(loaded.archivedThreads['QmArchived']).toBeUndefined()
+      expect(loaded.purgedDeletedComments['QmArchived']).toBe(true)
+      await archiver.stop()
+    })
+
+    it('purges deleted pinned threads', async () => {
+      const { instance, publishedModerations } = createMockPlebbit()
+      const threads = [
+        mockThread('QmPinned', { pinned: true, deleted: true }),
+        mockThread('QmNormal', { deleted: false }),
+      ]
+      const getPage = vi.fn().mockResolvedValue({
+        comments: threads,
+        nextCid: undefined,
+      } as Page)
+
+      const mockSub = createMockSubplebbit({
+        pageCids: { active: 'QmPage1' },
+        pages: {},
+        getPage,
+      })
+      vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
+
+      const archiver = await startArchiver({
+        subplebbitAddress: 'board.eth',
+        plebbitRpcUrl: 'ws://localhost:9138',
+        stateDir,
+        perPage: 15,
+        pages: 10,
+      })
+
+      await vi.waitFor(() => {
+        const purges = publishedModerations.filter((m) => m.commentModeration.purged === true)
+        expect(purges).toHaveLength(1)
+      })
+
+      const purges = publishedModerations.filter((m) => m.commentModeration.purged === true)
+      expect(purges[0].commentCid).toBe('QmPinned')
+      await archiver.stop()
+    })
+
+    it('purgedDeletedComments survives save/load cycle', () => {
+      const filePath = join(stateDir, 'test.json')
+      const state: ArchiverState = {
+        signers: {},
+        archivedThreads: {},
+        purgedDeletedComments: { 'QmDel1': true, 'QmDel2': true },
+      }
+      saveState(filePath, state)
+
+      const loaded = loadState(filePath)
+      expect(loaded.purgedDeletedComments['QmDel1']).toBe(true)
+      expect(loaded.purgedDeletedComments['QmDel2']).toBe(true)
+    })
+
+    it('old state files without purgedDeletedComments load with empty object', () => {
+      const filePath = join(stateDir, 'test.json')
+      // Simulate old state file format without purgedDeletedComments
+      mkdirSync(stateDir, { recursive: true })
+      writeFileSync(filePath, JSON.stringify({ signers: {}, archivedThreads: {} }))
+
+      const loaded = loadState(filePath)
+      expect(loaded.purgedDeletedComments).toEqual({})
+      expect(loaded.signers).toEqual({})
+      expect(loaded.archivedThreads).toEqual({})
     })
   })
 

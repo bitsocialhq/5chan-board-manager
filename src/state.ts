@@ -6,6 +6,7 @@ import type { ArchiverState, FileLock } from './types.js'
 const DEFAULT_STATE: ArchiverState = {
   signers: {},
   archivedThreads: {},
+  purgedDeletedComments: {},
 }
 
 export function defaultStateDir(): string {
@@ -15,7 +16,12 @@ export function defaultStateDir(): string {
 export function loadState(path: string): ArchiverState {
   try {
     const data = readFileSync(path, 'utf-8')
-    return JSON.parse(data) as ArchiverState
+    const parsed = JSON.parse(data) as Partial<ArchiverState>
+    return {
+      signers: parsed.signers ?? {},
+      archivedThreads: parsed.archivedThreads ?? {},
+      purgedDeletedComments: parsed.purgedDeletedComments ?? {},
+    }
   } catch {
     return structuredClone(DEFAULT_STATE)
   }

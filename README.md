@@ -72,22 +72,51 @@ All fields except `boards[].address` are optional:
 - `defaults` — applied to all boards unless overridden per-board
 - Per-board fields (`perPage`, `pages`, `bumpLimit`, `archivePurgeSeconds`) override `defaults`
 
-## Docker Example
+## Docker
 
-```dockerfile
-FROM node:22-slim
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --omit=dev
-COPY dist/ dist/
-COPY bin/ bin/
-VOLUME /data
-CMD ["node", "bin/run.js", "start", "--config", "/data/config.json"]
+Pre-built images are published to GitHub Container Registry after each release:
+
 ```
+ghcr.io/plebbit/5chan-board-cli:latest
+```
+
+### Docker Compose (recommended)
+
+Run 5chan alongside [bitsocial-cli](https://github.com/bitsocialhq/bitsocial-cli), which provides the Plebbit RPC server:
 
 ```bash
-docker run -v /host/data:/data my-archiver
+cp docker-compose.example.yml docker-compose.yml
+# Create /path/to/config.json with your boards (see Config File Format above)
+docker compose up -d
 ```
+
+See [`docker-compose.example.yml`](docker-compose.example.yml) for the full stack configuration.
+
+### Docker Run
+
+If you already have a Plebbit RPC server running on the host:
+
+```bash
+docker run -d \
+  --name 5chan \
+  -v /path/to/data:/data \
+  -e PLEBBIT_RPC_WS_URL=ws://host.docker.internal:9138 \
+  ghcr.io/plebbit/5chan-board-cli:latest
+```
+
+### Build locally
+
+```bash
+docker build -t 5chan-board-cli .
+docker run -d -v /path/to/data:/data 5chan-board-cli
+```
+
+### Data paths
+
+| Container path | Description |
+|---|---|
+| `/data/config.json` | Board configuration (create before first run, or use `5chan board add`) |
+| `/data/5chan-archiver/` | Per-board state files (auto-created) |
 
 ## systemd Service Example
 

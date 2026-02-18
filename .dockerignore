@@ -1,0 +1,15 @@
+node_modules
+dist
+.git
+e2e
+*.md
+.github
+.husky
+.vscode
+.claude
+.env
+.env.example
+.nvmrc
+vitest.config.ts
+vitest.e2e.config.ts
+commitlint.config.cjs

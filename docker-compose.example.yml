@@ -1,0 +1,43 @@
+# Example Docker Compose: 5chan archiver with bitsocial-cli (Plebbit RPC)
+#
+# Quick start:
+#   cp docker-compose.example.yml docker-compose.yml
+#   # Edit /path/to/config.json with your boards (see README.md)
+#   docker compose up -d
+#
+# View logs:
+#   docker compose logs -f 5chan
+
+services:
+  bitsocial:
+    image: ghcr.io/bitsocialhq/bitsocial-cli:latest
+    container_name: bitsocial
+    restart: unless-stopped
+    ports:
+      - "9138:9138"
+    volumes:
+      - bitsocial-data:/data
+      - bitsocial-logs:/logs
+    healthcheck:
+      test: ["CMD", "node", "-e", "const net=require('net');const s=net.connect(9138,'localhost',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),5000)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  5chan:
+    image: ghcr.io/plebbit/5chan-board-cli:latest
+    container_name: 5chan
+    restart: unless-stopped
+    depends_on:
+      bitsocial:
+        condition: service_healthy
+    volumes:
+      - 5chan-data:/data
+    environment:
+      - PLEBBIT_RPC_WS_URL=ws://bitsocial:9138
+
+volumes:
+  bitsocial-data:
+  bitsocial-logs:
+  5chan-data:

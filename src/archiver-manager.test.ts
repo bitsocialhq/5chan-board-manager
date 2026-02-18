@@ -176,6 +176,73 @@ describe('startArchiverManager', () => {
       await manager.stop()
     })
 
+    it('restarts archivers when board config changes', async () => {
+      const stopA = makeStopFn()
+      const stopNew = makeStopFn()
+      mockStartArchiver
+        .mockResolvedValueOnce({ stop: stopA })
+        .mockResolvedValueOnce({ stop: stopNew })
+
+      const dir = tmpDir()
+      const configPath = join(dir, 'config.json')
+      const config: MultiArchiverConfig = {
+        boards: [{ address: 'a.eth', bumpLimit: 300 }],
+      }
+      writeFileSync(configPath, JSON.stringify(config))
+
+      const manager = await startArchiverManager(configPath, config)
+      expect(manager.archivers.size).toBe(1)
+
+      // Write updated config with changed bumpLimit
+      const newConfig: MultiArchiverConfig = {
+        boards: [{ address: 'a.eth', bumpLimit: 500 }],
+      }
+      writeFileSync(configPath, JSON.stringify(newConfig))
+
+      // Wait for debounce + async handling
+      await new Promise((r) => setTimeout(r, 500))
+
+      expect(stopA).toHaveBeenCalledOnce()
+      expect(mockStartArchiver).toHaveBeenCalledTimes(2)
+      expect(manager.archivers.size).toBe(1)
+      expect(manager.archivers.has('a.eth')).toBe(true)
+
+      await manager.stop()
+    })
+
+    it('records error when restart of changed board fails', async () => {
+      const stopA = makeStopFn()
+      mockStartArchiver
+        .mockResolvedValueOnce({ stop: stopA })
+        .mockRejectedValueOnce(new Error('restart failed'))
+
+      const dir = tmpDir()
+      const configPath = join(dir, 'config.json')
+      const config: MultiArchiverConfig = {
+        boards: [{ address: 'a.eth', bumpLimit: 300 }],
+      }
+      writeFileSync(configPath, JSON.stringify(config))
+
+      const manager = await startArchiverManager(configPath, config)
+      expect(manager.archivers.size).toBe(1)
+
+      // Write updated config with changed bumpLimit
+      const newConfig: MultiArchiverConfig = {
+        boards: [{ address: 'a.eth', bumpLimit: 500 }],
+      }
+      writeFileSync(configPath, JSON.stringify(newConfig))
+
+      // Wait for debounce + async handling
+      await new Promise((r) => setTimeout(r, 500))
+
+      expect(stopA).toHaveBeenCalledOnce()
+      expect(manager.archivers.has('a.eth')).toBe(false)
+      expect(manager.errors.size).toBe(1)
+      expect(manager.errors.get('a.eth')?.message).toBe('restart failed')
+
+      await manager.stop()
+    })
+
     it('stops archivers when boards are removed from config', async () => {
       const stopA = makeStopFn()
       const stopB = makeStopFn()

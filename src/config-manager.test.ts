@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { loadConfig, saveConfig, addBoard, removeBoard, diffBoards } from './config-manager.js'
+import { loadConfig, saveConfig, addBoard, removeBoard, updateBoard, diffBoards } from './config-manager.js'
 import type { BoardConfig, MultiArchiverConfig } from './types.js'
 
 function makeTmpDir(): string {
@@ -387,5 +387,165 @@ describe('diffBoards', () => {
     }
     const diff = diffBoards(oldConfig, newConfig)
     expect(diff.added[0]).toEqual({ address: 'a.eth', bumpLimit: 500, perPage: 30 })
+  })
+
+  it('detects changed boards when a field is modified', () => {
+    const oldConfig: MultiArchiverConfig = {
+      boards: [{ address: 'a.eth', bumpLimit: 300 }],
+    }
+    const newConfig: MultiArchiverConfig = {
+      boards: [{ address: 'a.eth', bumpLimit: 500 }],
+    }
+    const diff = diffBoards(oldConfig, newConfig)
+    expect(diff.added).toHaveLength(0)
+    expect(diff.removed).toHaveLength(0)
+    expect(diff.changed).toHaveLength(1)
+    expect(diff.changed[0]).toEqual({ address: 'a.eth', bumpLimit: 500 })
+  })
+
+  it('detects changed boards when a field is added', () => {
+    const oldConfig: MultiArchiverConfig = {
+      boards: [{ address: 'a.eth' }],
+    }
+    const newConfig: MultiArchiverConfig = {
+      boards: [{ address: 'a.eth', perPage: 25 }],
+    }
+    const diff = diffBoards(oldConfig, newConfig)
+    expect(diff.changed).toHaveLength(1)
+    expect(diff.changed[0].perPage).toBe(25)
+  })
+
+  it('detects changed boards when a field is removed', () => {
+    const oldConfig: MultiArchiverConfig = {
+      boards: [{ address: 'a.eth', bumpLimit: 300 }],
+    }
+    const newConfig: MultiArchiverConfig = {
+      boards: [{ address: 'a.eth' }],
+    }
+    const diff = diffBoards(oldConfig, newConfig)
+    expect(diff.changed).toHaveLength(1)
+    expect(diff.changed[0]).toEqual({ address: 'a.eth' })
+  })
+
+  it('returns empty changed when board configs are identical', () => {
+    const config: MultiArchiverConfig = {
+      boards: [{ address: 'a.eth', bumpLimit: 300 }],
+    }
+    const diff = diffBoards(config, { ...config, boards: [{ address: 'a.eth', bumpLimit: 300 }] })
+    expect(diff.changed).toHaveLength(0)
+  })
+
+  it('separates added, removed, and changed correctly', () => {
+    const oldConfig: MultiArchiverConfig = {
+      boards: [{ address: 'a.eth', perPage: 10 }, { address: 'b.eth' }],
+    }
+    const newConfig: MultiArchiverConfig = {
+      boards: [{ address: 'a.eth', perPage: 20 }, { address: 'c.eth' }],
+    }
+    const diff = diffBoards(oldConfig, newConfig)
+    expect(diff.added).toHaveLength(1)
+    expect(diff.added[0].address).toBe('c.eth')
+    expect(diff.removed).toEqual(['b.eth'])
+    expect(diff.changed).toHaveLength(1)
+    expect(diff.changed[0]).toEqual({ address: 'a.eth', perPage: 20 })
+  })
+})
+
+describe('updateBoard', () => {
+  it('updates a single field on an existing board', () => {
+    const config: MultiArchiverConfig = {
+      boards: [{ address: 'a.eth', bumpLimit: 300 }],
+    }
+    const result = updateBoard(config, 'a.eth', { bumpLimit: 500 })
+    expect(result.boards[0].bumpLimit).toBe(500)
+  })
+
+  it('adds a new field to an existing board', () => {
+    const config: MultiArchiverConfig = {
+      boards: [{ address: 'a.eth' }],
+    }
+    const result = updateBoard(config, 'a.eth', { perPage: 25 })
+    expect(result.boards[0].perPage).toBe(25)
+  })
+
+  it('updates multiple fields at once', () => {
+    const config: MultiArchiverConfig = {
+      boards: [{ address: 'a.eth' }],
+    }
+    const result = updateBoard(config, 'a.eth', { perPage: 25, pages: 3 })
+    expect(result.boards[0].perPage).toBe(25)
+    expect(result.boards[0].pages).toBe(3)
+  })
+
+  it('resets a field to undefined', () => {
+    const config: MultiArchiverConfig = {
+      boards: [{ address: 'a.eth', bumpLimit: 500 }],
+    }
+    const result = updateBoard(config, 'a.eth', {}, ['bumpLimit'])
+    expect(Object.hasOwn(result.boards[0], 'bumpLimit')).toBe(false)
+  })
+
+  it('resets multiple fields', () => {
+    const config: MultiArchiverConfig = {
+      boards: [{ address: 'a.eth', perPage: 25, pages: 3, bumpLimit: 500, archivePurgeSeconds: 86400 }],
+    }
+    const result = updateBoard(config, 'a.eth', {}, ['perPage', 'bumpLimit'])
+    expect(Object.hasOwn(result.boards[0], 'perPage')).toBe(false)
+    expect(Object.hasOwn(result.boards[0], 'bumpLimit')).toBe(false)
+    expect(result.boards[0].pages).toBe(3)
+    expect(result.boards[0].archivePurgeSeconds).toBe(86400)
+  })
+
+  it('allows setting one field and resetting another simultaneously', () => {
+    const config: MultiArchiverConfig = {
+      boards: [{ address: 'a.eth', perPage: 25, bumpLimit: 300 }],
+    }
+    const result = updateBoard(config, 'a.eth', { perPage: 30 }, ['bumpLimit'])
+    expect(result.boards[0].perPage).toBe(30)
+    expect(Object.hasOwn(result.boards[0], 'bumpLimit')).toBe(false)
+  })
+
+  it('throws when board not found', () => {
+    const config: MultiArchiverConfig = { boards: [{ address: 'a.eth' }] }
+    expect(() => updateBoard(config, 'missing.eth', { bumpLimit: 500 })).toThrow(
+      'Board "missing.eth" not found in config',
+    )
+  })
+
+  it('throws when setting and resetting the same field', () => {
+    const config: MultiArchiverConfig = { boards: [{ address: 'a.eth' }] }
+    expect(() => updateBoard(config, 'a.eth', { perPage: 25 }, ['perPage'])).toThrow(
+      'Cannot set and reset the same field "perPage"',
+    )
+  })
+
+  it('does not mutate the original config', () => {
+    const config: MultiArchiverConfig = {
+      boards: [{ address: 'a.eth', bumpLimit: 300 }],
+    }
+    const result = updateBoard(config, 'a.eth', { bumpLimit: 500 })
+    expect(config.boards[0].bumpLimit).toBe(300)
+    expect(result.boards[0].bumpLimit).toBe(500)
+  })
+
+  it('preserves other boards and top-level config fields', () => {
+    const config: MultiArchiverConfig = {
+      rpcUrl: 'ws://test:9138',
+      defaults: { perPage: 20 },
+      boards: [{ address: 'a.eth' }, { address: 'b.eth', bumpLimit: 300 }],
+    }
+    const result = updateBoard(config, 'b.eth', { bumpLimit: 500 })
+    expect(result.rpcUrl).toBe('ws://test:9138')
+    expect(result.defaults?.perPage).toBe(20)
+    expect(result.boards[0]).toEqual({ address: 'a.eth' })
+    expect(result.boards[1].bumpLimit).toBe(500)
+  })
+
+  it('preserves address field', () => {
+    const config: MultiArchiverConfig = {
+      boards: [{ address: 'a.eth' }],
+    }
+    const result = updateBoard(config, 'a.eth', { bumpLimit: 500 })
+    expect(result.boards[0].address).toBe('a.eth')
   })
 })

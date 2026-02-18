@@ -62,9 +62,9 @@ export async function startArchiverManager(
         return
       }
 
-      const { added, removed } = diffBoards(currentConfig, newConfig)
+      const { added, removed, changed } = diffBoards(currentConfig, newConfig)
 
-      if (added.length === 0 && removed.length === 0) {
+      if (added.length === 0 && removed.length === 0 && changed.length === 0) {
         currentConfig = newConfig
         return
       }
@@ -84,6 +84,32 @@ export async function startArchiverManager(
         errors.delete(address)
       }
 
+      // Restart changed archivers
+      for (const board of changed) {
+        const archiver = archivers.get(board.address)
+        if (archiver) {
+          try {
+            log(`stopping archiver for changed board ${board.address}`)
+            await archiver.stop()
+          } catch (err) {
+            log.error(`failed to stop archiver for ${board.address}: ${err}`)
+          }
+          archivers.delete(board.address)
+        }
+        errors.delete(board.address)
+
+        const options = resolveArchiverOptions(board, newConfig)
+        try {
+          log(`starting archiver for changed board ${board.address}`)
+          const result = await startArchiver(options)
+          archivers.set(board.address, result)
+        } catch (err) {
+          const error = err instanceof Error ? err : new Error(String(err))
+          log.error(`failed to start archiver for ${board.address}: ${error.message}`)
+          errors.set(board.address, error)
+        }
+      }
+
       // Start added archivers
       for (const board of added) {
         const options = resolveArchiverOptions(board, newConfig)
@@ -101,8 +127,8 @@ export async function startArchiverManager(
 
       currentConfig = newConfig
 
-      if (added.length > 0 || removed.length > 0) {
-        log(`config reloaded: +${added.length} added, -${removed.length} removed, ${archivers.size} running`)
+      if (added.length > 0 || removed.length > 0 || changed.length > 0) {
+        log(`config reloaded: +${added.length} added, -${removed.length} removed, ~${changed.length} changed, ${archivers.size} running`)
       }
     } finally {
       reloading = false

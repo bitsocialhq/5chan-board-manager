@@ -4,7 +4,7 @@ A CLI tool that implements 4chan-style thread auto-archiving and purging for Bit
 
 ### Config File Format
 
-The config file (`~/.config/5chan/config.json`) is managed via `5chan board add/remove` or manual editing:
+The config file (`~/.config/5chan/config.json`) is managed via `5chan board add/edit/remove` or manual editing:
 
 ```json
 {
@@ -32,13 +32,7 @@ All fields except `boards[].address` are optional:
 - `defaults` — applied to all boards unless overridden per-board
 - Per-board fields (`perPage`, `pages`, `bumpLimit`, `archivePurgeSeconds`) override `defaults`
 
-## Docker
 
-Pre-built images are published to GitHub Container Registry after each release:
-
-```
-ghcr.io/plebbit/5chan-board-cli:latest
-```
 
 ### Docker Compose (recommended)
 
@@ -83,11 +77,17 @@ docker compose exec 5chan 5chan board add random.eth
 # List configured boards
 docker compose exec 5chan 5chan board list
 
+# Edit a board's config
+docker compose exec 5chan 5chan board edit random.eth --bump-limit 500
+
+# Reset a board field to global default
+docker compose exec 5chan 5chan board edit random.eth --reset per-page
+
 # Remove a board
 docker compose exec 5chan 5chan board remove random.eth
 ```
 
-The container auto-reloads when `/data/config.json` changes, so boards added via `5chan board add` take effect immediately without restarting.
+The container auto-reloads when `/data/config.json` changes, so boards added/edited via `5chan board add/edit` take effect immediately without restarting.
 
 ### Build locally
 
@@ -102,23 +102,6 @@ docker run -d -v /path/to/data:/data 5chan-board-cli
 |---|---|
 | `/data/config.json` | Board configuration (create before first run, or use `5chan board add`) |
 | `/data/5chan-archiver/` | Per-board state files (auto-created) |
-
-## systemd Service Example
-
-```ini
-[Unit]
-Description=5chan Board Archiver
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/node /opt/5chan-archiver/bin/run.js start --config /etc/5chan-archiver/config.json
-Restart=on-failure
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
 
 ## Commands
 
@@ -251,10 +234,11 @@ _See code: [src/commands/start.ts](https://github.com/plebbit/5chan_board_custom
 1. Loads and validates the new config
 2. Diffs old vs new boards
 3. Stops archivers for removed boards
-4. Starts archivers for added boards
-5. Logs the delta: `config reloaded: +N added, -N removed, M running`
+4. Restarts archivers for boards with changed config
+5. Starts archivers for added boards
+6. Logs the delta: `config reloaded: +N added, -N removed, ~N changed, M running`
 
-This means you can add or remove boards while the archiver is running — either by editing the config file directly or by running `5chan board add/remove` in another terminal.
+This means you can add, edit, or remove boards while the archiver is running — either by editing the config file directly or by running `5chan board add/edit/remove` in another terminal.
 
 ## File Locking
 

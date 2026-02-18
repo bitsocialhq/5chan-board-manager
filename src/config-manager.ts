@@ -130,20 +130,77 @@ export function removeBoard(config: MultiArchiverConfig, address: string): Multi
 }
 
 /**
+ * Update an existing board's config. Throws if not found.
+ * Fields in `updates` are merged onto the existing board.
+ * Fields listed in `resetFields` are removed (reverts to defaults).
+ */
+export function updateBoard(
+  config: MultiArchiverConfig,
+  address: string,
+  updates: Partial<Omit<BoardConfig, 'address'>>,
+  resetFields?: ReadonlyArray<keyof Omit<BoardConfig, 'address'>>,
+): MultiArchiverConfig {
+  const idx = config.boards.findIndex((b) => b.address === address)
+  if (idx === -1) {
+    throw new Error(`Board "${address}" not found in config`)
+  }
+
+  if (resetFields) {
+    for (const field of resetFields) {
+      if (field in updates) {
+        throw new Error(`Cannot set and reset the same field "${field}"`)
+      }
+    }
+  }
+
+  const existing = config.boards[idx]
+  const updated: BoardConfig = { ...existing, ...updates }
+
+  if (resetFields) {
+    for (const field of resetFields) {
+      delete updated[field]
+    }
+  }
+
+  return {
+    ...config,
+    boards: config.boards.map((b, i) => (i === idx ? updated : b)),
+  }
+}
+
+function boardConfigChanged(a: BoardConfig, b: BoardConfig): boolean {
+  return (
+    a.perPage !== b.perPage ||
+    a.pages !== b.pages ||
+    a.bumpLimit !== b.bumpLimit ||
+    a.archivePurgeSeconds !== b.archivePurgeSeconds
+  )
+}
+
+/**
  * Compute the diff between two configs for hot-reload.
- * Returns boards that were added and addresses that were removed.
+ * Returns boards that were added, removed, or changed.
  */
 export function diffBoards(
   oldConfig: MultiArchiverConfig,
   newConfig: MultiArchiverConfig,
-): { added: BoardConfig[]; removed: string[] } {
+): { added: BoardConfig[]; removed: string[]; changed: BoardConfig[] } {
   const oldAddresses = new Set(oldConfig.boards.map((b) => b.address))
   const newAddresses = new Set(newConfig.boards.map((b) => b.address))
+  const oldByAddress = new Map(oldConfig.boards.map((b) => [b.address, b]))
 
   const added = newConfig.boards.filter((b) => !oldAddresses.has(b.address))
   const removed = oldConfig.boards
     .filter((b) => !newAddresses.has(b.address))
     .map((b) => b.address)
 
-  return { added, removed }
+  const changed: BoardConfig[] = []
+  for (const newBoard of newConfig.boards) {
+    const oldBoard = oldByAddress.get(newBoard.address)
+    if (oldBoard && boardConfigChanged(oldBoard, newBoard)) {
+      changed.push(newBoard)
+    }
+  }
+
+  return { added, removed, changed }
 }

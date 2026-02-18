@@ -1,0 +1,18 @@
+{
+  "boardSettings": {
+    "features": {
+      "noUpvotes": true,
+      "noDownvotes": true,
+      "requirePostLinkIsMedia": true,
+      "requirePostLink": true,
+      "requireReplyLink": false,
+      "pseudonymityMode": "per-post"
+    }
+  },
+  "boardManagerSettings": {
+    "perPage": 15,
+    "pages": 10,
+    "bumpLimit": 300,
+    "archivePurgeSeconds": 172800
+  }
+}

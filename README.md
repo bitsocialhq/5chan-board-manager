@@ -1,6 +1,6 @@
 # 5chan Board Manager
 
-A CLI tool that implements 4chan-style thread auto-archiving and purging for Bitsocial communities.
+A CLI tool that implements 4chan-style thread auto-archiving and purging for 5chan boards.
 
 ### Feature 1: Thread limit / auto-archive
 
@@ -126,6 +126,43 @@ docker run -d -v /path/to/data:/data 5chan-board-manager
 | `/data/config.json` | Board configuration (create before first run, or use `5chan board add`) |
 | `/data/5chan-board-manager/` | Per-board state files (auto-created) |
 
+### Board creation and defaults preset
+
+Create the community (subplebbit/board) with `bitsocial community create` first, then add it to 5chan with `5chan board add`.
+
+When you run `5chan board add`:
+
+- Interactive terminals: prompts to apply the 5chan preset defaults, with default answer **yes**
+- Non-interactive mode (CI, pipes): requires explicit `--apply-defaults` or `--skip-apply-defaults`
+- Custom preset JSON: pass `--defaults-preset /path/to/preset.json`
+
+Preset JSON is validated with Zod. Schema:
+
+```json
+{
+  "boardSettings": {
+    "features": {
+      "noUpvotes": true,
+      "noDownvotes": true,
+      "requirePostLinkIsMedia": true,
+      "requirePostLink": true,
+      "requireReplyLink": false,
+      "pseudonymityMode": "per-post"
+    }
+  },
+  "boardManagerSettings": {
+    "perPage": 15,
+    "pages": 10,
+    "bumpLimit": 300,
+    "archivePurgeSeconds": 172800
+  }
+}
+```
+
+`boardSettings` is merged into `subplebbit.edit()` with "missing only" semantics. `boardManagerSettings` is used as default values for `board add` config fields, and explicit CLI flags still win.
+
+The bundled preset file is `src/presets/community-defaults.json`.
+
 ## Commands
 
 <!-- commands -->
@@ -143,18 +180,21 @@ Add a board to the config
 ```
 USAGE
   $ 5chan board add ADDRESS [--rpc-url <value>] [--per-page <value>] [--pages <value>] [--bump-limit <value>]
-    [--archive-purge-seconds <value>]
+    [--archive-purge-seconds <value>] [--apply-defaults] [--skip-apply-defaults] [--defaults-preset <value>]
 
 ARGUMENTS
   ADDRESS  Subplebbit address to add
 
 FLAGS
+  --apply-defaults                 Apply preset defaults before adding to config
   --archive-purge-seconds=<value>  Seconds after archiving before purge
   --bump-limit=<value>             Bump limit for threads
+  --defaults-preset=<value>        Path to a custom preset JSON file
   --pages=<value>                  Number of pages
   --per-page=<value>               Posts per page
   --rpc-url=<value>                [default: ws://localhost:9138, env: PLEBBIT_RPC_WS_URL] Plebbit RPC WebSocket URL
                                    (for validation)
+  --skip-apply-defaults            Skip applying preset defaults before adding to config
 
 DESCRIPTION
   Add a board to the config
@@ -167,6 +207,12 @@ EXAMPLES
   $ 5chan board add flash.eth --per-page 30 --pages 1
 
   $ 5chan board add my-board.eth --rpc-url ws://custom-host:9138
+
+  $ 5chan board add my-board.eth --apply-defaults
+
+  $ 5chan board add my-board.eth --skip-apply-defaults
+
+  $ 5chan board add my-board.eth --apply-defaults --defaults-preset ./my-preset.json
 ```
 
 _See code: [src/commands/board/add.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.0/src/commands/board/add.ts)_

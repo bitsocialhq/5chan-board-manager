@@ -35,7 +35,7 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-presets.mjs",
     "generate:readme": "npx oclif readme",
     "commit": "cz",
     "prepare": "husky && npm run build",
@@ -47,7 +47,8 @@
     "@oclif/core": "4.8.0",
     "@oclif/plugin-help": "6.2.37",
     "@plebbit/plebbit-js": "git+https://github.com/plebbit/plebbit-js.git#a92fb7e82b4a534c160fc74dc1902d63e24e3142",
-    "env-paths": "4.0.0"
+    "env-paths": "4.0.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@commitlint/cli": "20.4.1",
@@ -56,9 +57,9 @@
     "commitizen": "4.3.1",
     "cz-conventional-changelog": "3.3.0",
     "husky": "9.1.7",
+    "oclif": "4.22.59",
     "release-it": "19.2.4",
     "typescript": "5.9.3",
-    "oclif": "4.22.59",
     "vitest": "4.0.18"
   },
   "config": {

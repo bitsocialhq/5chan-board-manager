@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { startArchiver } from '../src/archiver.js'
-import type { PlebbitInstance, ArchiverResult } from '../src/types.js'
+import { startBoardManager } from '../src/board-manager.js'
+import type { PlebbitInstance, BoardManagerResult } from '../src/types.js'
 import {
   RPC_URL,
   createPlebbitRpc,
@@ -20,7 +20,7 @@ import {
   getAllThreads,
 } from './helpers.js'
 
-describe('archiver E2E', () => {
+describe('board manager E2E', () => {
   let plebbit: PlebbitInstance
 
   beforeAll(async () => {
@@ -35,7 +35,7 @@ describe('archiver E2E', () => {
     it('archives threads beyond capacity', async () => {
       const { sub, address } = await createTestSubplebbit(plebbit)
       const { dir, statePath } = createTempStateDir()
-      let archiver: ArchiverResult | undefined
+      let boardManager: BoardManagerResult | undefined
 
       try {
         // Publish 4 threads sequentially, waiting for each to appear in pages
@@ -54,7 +54,7 @@ describe('archiver E2E', () => {
         // capacity = perPage * pages = 1 * 2 = 2
         // Active sort: T4 (newest), T3, T2, T1 (oldest)
         // T1 and T2 are beyond capacity and should be archived
-        archiver = await startArchiver({
+        boardManager = await startBoardManager({
           subplebbitAddress: address,
           plebbitRpcUrl: RPC_URL,
           statePath,
@@ -85,7 +85,7 @@ describe('archiver E2E', () => {
         expect(t3InPages?.archived).toBeUndefined()
         expect(t4InPages?.archived).toBeUndefined()
       } finally {
-        if (archiver) await archiver.stop()
+        if (boardManager) await boardManager.stop()
         await sub.stop()
         cleanupTempDir(dir)
       }
@@ -94,7 +94,7 @@ describe('archiver E2E', () => {
     it('does not archive threads within capacity', async () => {
       const { sub, address } = await createTestSubplebbit(plebbit)
       const { dir, statePath } = createTempStateDir()
-      let archiver: ArchiverResult | undefined
+      let boardManager: BoardManagerResult | undefined
 
       try {
         // Publish 3 threads
@@ -108,7 +108,7 @@ describe('archiver E2E', () => {
         await waitForThreadInPages(sub, t3.cid)
 
         // capacity = 5 * 1 = 5, we only have 3 threads — all within capacity
-        archiver = await startArchiver({
+        boardManager = await startBoardManager({
           subplebbitAddress: address,
           plebbitRpcUrl: RPC_URL,
           statePath,
@@ -116,7 +116,7 @@ describe('archiver E2E', () => {
           pages: 1,
         })
 
-        // Wait for archiver to be ready (signer created in state)
+        // Wait for board manager to be ready (signer created in state)
         await waitForSignerInState(statePath, address)
 
         // Give a few update cycles
@@ -132,7 +132,7 @@ describe('archiver E2E', () => {
           expect(thread.archived).toBeUndefined()
         }
       } finally {
-        if (archiver) await archiver.stop()
+        if (boardManager) await boardManager.stop()
         await sub.stop()
         cleanupTempDir(dir)
       }
@@ -143,7 +143,7 @@ describe('archiver E2E', () => {
     it('archives thread that reaches bump limit', async () => {
       const { sub, address } = await createTestSubplebbit(plebbit)
       const { dir, statePath } = createTempStateDir()
-      let archiver: ArchiverResult | undefined
+      let boardManager: BoardManagerResult | undefined
 
       try {
         // Publish 1 thread + 3 replies
@@ -158,7 +158,7 @@ describe('archiver E2E', () => {
         await waitForReplyCount(sub, thread.cid, 3)
 
         // bumpLimit=3, large capacity so only bump limit triggers
-        archiver = await startArchiver({
+        boardManager = await startBoardManager({
           subplebbitAddress: address,
           plebbitRpcUrl: RPC_URL,
           statePath,
@@ -177,7 +177,7 @@ describe('archiver E2E', () => {
         // Verify thread is actually archived in subplebbit pages
         await waitForThreadArchived(sub, thread.cid)
       } finally {
-        if (archiver) await archiver.stop()
+        if (boardManager) await boardManager.stop()
         await sub.stop()
         cleanupTempDir(dir)
       }
@@ -188,7 +188,7 @@ describe('archiver E2E', () => {
     it('purges archived thread after archivePurgeSeconds', async () => {
       const { sub, address } = await createTestSubplebbit(plebbit)
       const { dir, statePath } = createTempStateDir()
-      let archiver: ArchiverResult | undefined
+      let boardManager: BoardManagerResult | undefined
 
       try {
         // Publish 2 threads (T1 oldest, T2 newest)
@@ -199,7 +199,7 @@ describe('archiver E2E', () => {
         await waitForThreadInPages(sub, t2.cid)
 
         // capacity=1, purge after 5 seconds
-        archiver = await startArchiver({
+        boardManager = await startBoardManager({
           subplebbitAddress: address,
           plebbitRpcUrl: RPC_URL,
           statePath,
@@ -222,7 +222,7 @@ describe('archiver E2E', () => {
         const stateAfterPurge = readStateFile(statePath)
         expect(stateAfterPurge.archivedThreads[t1.cid]).toBeUndefined()
       } finally {
-        if (archiver) await archiver.stop()
+        if (boardManager) await boardManager.stop()
         await sub.stop()
         cleanupTempDir(dir)
       }
@@ -233,7 +233,7 @@ describe('archiver E2E', () => {
     it('does not archive pinned threads', async () => {
       const { sub, address } = await createTestSubplebbit(plebbit)
       const { dir, statePath } = createTempStateDir()
-      let archiver: ArchiverResult | undefined
+      let boardManager: BoardManagerResult | undefined
 
       try {
         // Publish 3 threads
@@ -264,7 +264,7 @@ describe('archiver E2E', () => {
 
         // capacity=1, so among non-pinned (T1, T2), only 1 fits
         // Active sort: T2 (newer), T1 (older) → T1 beyond capacity
-        archiver = await startArchiver({
+        boardManager = await startBoardManager({
           subplebbitAddress: address,
           plebbitRpcUrl: RPC_URL,
           statePath,
@@ -294,7 +294,7 @@ describe('archiver E2E', () => {
         const t2InPages = threads.find((t) => t.cid === t2.cid)
         expect(t2InPages?.archived).toBeUndefined()
       } finally {
-        if (archiver) await archiver.stop()
+        if (boardManager) await boardManager.stop()
         await sub.stop()
         cleanupTempDir(dir)
       }

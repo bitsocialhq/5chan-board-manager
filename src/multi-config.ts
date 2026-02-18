@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs'
-import type { ArchiverOptions, BoardConfig, MultiArchiverConfig } from './types.js'
+import type { BoardManagerOptions, BoardConfig, MultiBoardConfig } from './types.js'
 
 /**
- * Load and validate a multi-archiver JSON config file.
+ * Load and validate a multi-board JSON config file.
  * Throws with a descriptive message on any validation error.
  */
-export function loadMultiConfig(configPath: string): MultiArchiverConfig {
+export function loadMultiConfig(configPath: string): MultiBoardConfig {
   let raw: string
   try {
     raw = readFileSync(configPath, 'utf-8')
@@ -65,7 +65,7 @@ export function loadMultiConfig(configPath: string): MultiArchiverConfig {
     validateNumericFields(board, `boards[${i}]`, configPath)
   }
 
-  return config as unknown as MultiArchiverConfig
+  return config as unknown as MultiBoardConfig
 }
 
 function validateNumericFields(obj: Record<string, unknown>, prefix: string, configPath: string): void {
@@ -81,12 +81,12 @@ function validateNumericFields(obj: Record<string, unknown>, prefix: string, con
 
 /**
  * Merge a board config with top-level defaults and rpcUrl/stateDir
- * to produce ArchiverOptions for startArchiver().
+ * to produce BoardManagerOptions for startBoardManager().
  *
  * Only sets fields that are explicitly configured — undefined fields
- * let startArchiver's built-in DEFAULTS remain the source of truth.
+ * let startBoardManager's built-in DEFAULTS remain the source of truth.
  */
-export function resolveArchiverOptions(board: BoardConfig, config: MultiArchiverConfig): ArchiverOptions {
+export function resolveBoardManagerOptions(board: BoardConfig, config: MultiBoardConfig): BoardManagerOptions {
   const rpcUrl = config.rpcUrl ?? process.env.PLEBBIT_RPC_WS_URL ?? 'ws://localhost:9138'
 
   return {

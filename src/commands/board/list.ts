@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { loadConfig } from '../../config-manager.js'
 
 export default class BoardList extends Command {
-  static override description = 'List all boards in the archiver config'
+  static override description = 'List all boards in the config'
 
   static override examples = [
     '5chan board list',

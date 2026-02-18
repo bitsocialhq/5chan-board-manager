@@ -1,4 +1,4 @@
-# Example Docker Compose: 5chan archiver with bitsocial-cli (Plebbit RPC)
+# Example Docker Compose: 5chan board manager with bitsocial-cli (Plebbit RPC)
 #
 # Quick start:
 #   cp docker-compose.example.yml docker-compose.yml

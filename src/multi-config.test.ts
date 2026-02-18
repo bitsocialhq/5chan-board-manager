@@ -2,8 +2,8 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { loadMultiConfig, resolveArchiverOptions } from './multi-config.js'
-import type { BoardConfig, MultiArchiverConfig } from './types.js'
+import { loadMultiConfig, resolveBoardManagerOptions } from './multi-config.js'
+import type { BoardConfig, MultiBoardConfig } from './types.js'
 
 function makeTmpDir(): string {
   return mkdtempSync(join(tmpdir(), 'multi-config-test-'))
@@ -179,7 +179,7 @@ describe('loadMultiConfig', () => {
   })
 })
 
-describe('resolveArchiverOptions', () => {
+describe('resolveBoardManagerOptions', () => {
   const envBackup = process.env.PLEBBIT_RPC_WS_URL
 
   afterEach(() => {
@@ -193,37 +193,37 @@ describe('resolveArchiverOptions', () => {
   it('uses config rpcUrl over env var and default', () => {
     process.env.PLEBBIT_RPC_WS_URL = 'ws://env:9138'
     const board: BoardConfig = { address: 'a.eth' }
-    const config: MultiArchiverConfig = {
+    const config: MultiBoardConfig = {
       rpcUrl: 'ws://config:9138',
       boards: [board],
     }
-    const opts = resolveArchiverOptions(board, config)
+    const opts = resolveBoardManagerOptions(board, config)
     expect(opts.plebbitRpcUrl).toBe('ws://config:9138')
   })
 
   it('falls back to env var when rpcUrl not in config', () => {
     process.env.PLEBBIT_RPC_WS_URL = 'ws://env:9138'
     const board: BoardConfig = { address: 'a.eth' }
-    const config: MultiArchiverConfig = { boards: [board] }
-    const opts = resolveArchiverOptions(board, config)
+    const config: MultiBoardConfig = { boards: [board] }
+    const opts = resolveBoardManagerOptions(board, config)
     expect(opts.plebbitRpcUrl).toBe('ws://env:9138')
   })
 
   it('falls back to default when neither config nor env var set', () => {
     delete process.env.PLEBBIT_RPC_WS_URL
     const board: BoardConfig = { address: 'a.eth' }
-    const config: MultiArchiverConfig = { boards: [board] }
-    const opts = resolveArchiverOptions(board, config)
+    const config: MultiBoardConfig = { boards: [board] }
+    const opts = resolveBoardManagerOptions(board, config)
     expect(opts.plebbitRpcUrl).toBe('ws://localhost:9138')
   })
 
   it('per-board values override defaults', () => {
     const board: BoardConfig = { address: 'a.eth', bumpLimit: 500, perPage: 30 }
-    const config: MultiArchiverConfig = {
+    const config: MultiBoardConfig = {
       defaults: { bumpLimit: 300, perPage: 15, pages: 5 },
       boards: [board],
     }
-    const opts = resolveArchiverOptions(board, config)
+    const opts = resolveBoardManagerOptions(board, config)
     expect(opts.bumpLimit).toBe(500)
     expect(opts.perPage).toBe(30)
     expect(opts.pages).toBe(5)
@@ -231,8 +231,8 @@ describe('resolveArchiverOptions', () => {
 
   it('leaves unset fields as undefined so startArchiver uses its own defaults', () => {
     const board: BoardConfig = { address: 'a.eth' }
-    const config: MultiArchiverConfig = { boards: [board] }
-    const opts = resolveArchiverOptions(board, config)
+    const config: MultiBoardConfig = { boards: [board] }
+    const opts = resolveBoardManagerOptions(board, config)
     expect(opts.perPage).toBeUndefined()
     expect(opts.pages).toBeUndefined()
     expect(opts.bumpLimit).toBeUndefined()
@@ -242,18 +242,18 @@ describe('resolveArchiverOptions', () => {
 
   it('passes stateDir from config', () => {
     const board: BoardConfig = { address: 'a.eth' }
-    const config: MultiArchiverConfig = {
+    const config: MultiBoardConfig = {
       stateDir: '/data/state',
       boards: [board],
     }
-    const opts = resolveArchiverOptions(board, config)
+    const opts = resolveBoardManagerOptions(board, config)
     expect(opts.stateDir).toBe('/data/state')
   })
 
   it('sets subplebbitAddress from board address', () => {
     const board: BoardConfig = { address: 'my-board.eth' }
-    const config: MultiArchiverConfig = { boards: [board] }
-    const opts = resolveArchiverOptions(board, config)
+    const config: MultiBoardConfig = { boards: [board] }
+    const opts = resolveBoardManagerOptions(board, config)
     expect(opts.subplebbitAddress).toBe('my-board.eth')
   })
 })

@@ -1,4 +1,4 @@
-# 5chan archiver only — use when bitsocial-cli is already running elsewhere
+# 5chan board manager only — use when bitsocial-cli is already running elsewhere
 #
 # Quick start:
 #   cp docker-compose.standalone.example.yml docker-compose.yml

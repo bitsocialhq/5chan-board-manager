@@ -18,7 +18,7 @@ export type Page = Awaited<ReturnType<Subplebbit['posts']['getPage']>>
 /** A comment/thread within a page */
 export type ThreadComment = Page['comments'][number]
 
-export interface ArchiverOptions {
+export interface BoardManagerOptions {
   subplebbitAddress: string
   plebbitRpcUrl: string
   stateDir?: string
@@ -28,7 +28,7 @@ export interface ArchiverOptions {
   archivePurgeSeconds?: number
 }
 
-export interface ArchiverResult {
+export interface BoardManagerResult {
   stop: () => Promise<void>
 }
 
@@ -45,12 +45,12 @@ export interface FileLock {
   release: () => void
 }
 
-export interface ArchiverState {
+export interface BoardManagerState {
   signers: Record<string, SignerState>
   archivedThreads: Record<string, ArchivedThread>
 }
 
-/** Per-board config entry in the multi-archiver config file */
+/** Per-board config entry in the multi-board config file */
 export interface BoardConfig {
   address: string
   perPage?: number
@@ -67,17 +67,17 @@ export interface BoardDefaults {
   archivePurgeSeconds?: number
 }
 
-/** Top-level multi-archiver JSON config */
-export interface MultiArchiverConfig {
+/** Top-level multi-board JSON config */
+export interface MultiBoardConfig {
   rpcUrl?: string
   stateDir?: string
   defaults?: BoardDefaults
   boards: BoardConfig[]
 }
 
-/** Result of starting the multi-archiver */
-export interface MultiArchiverResult {
-  archivers: Map<string, ArchiverResult>
+/** Result of starting multi-board managers */
+export interface MultiBoardResult {
+  boardManagers: Map<string, BoardManagerResult>
   errors: Map<string, Error>
   stop: () => Promise<void>
 }

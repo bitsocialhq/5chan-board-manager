@@ -27,7 +27,7 @@
     ],
     "topics": {
       "board": {
-        "description": "Manage boards in the archiver config"
+        "description": "Manage boards in the config"
       }
     }
   },

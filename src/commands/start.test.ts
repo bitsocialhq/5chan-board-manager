@@ -3,23 +3,23 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-vi.mock('../archiver-manager.js', () => ({
-  startArchiverManager: vi.fn(),
+vi.mock('../board-managers.js', () => ({
+  startBoardManagers: vi.fn(),
 }))
 
-import { startArchiverManager } from '../archiver-manager.js'
-import type { ArchiverManager } from '../archiver-manager.js'
+import { startBoardManagers } from '../board-managers.js'
+import type { BoardManagers } from '../board-managers.js'
 import Start from './start.js'
 
-const mockStartManager = vi.mocked(startArchiverManager)
+const mockStartManager = vi.mocked(startBoardManagers)
 
 function makeTmpDir(): string {
   return mkdtempSync(join(tmpdir(), 'start-test-'))
 }
 
-function makeMockManager(overrides?: Partial<ArchiverManager>): ArchiverManager {
+function makeMockManager(overrides?: Partial<BoardManagers>): BoardManagers {
   return {
-    archivers: new Map(),
+    boardManagers: new Map(),
     errors: new Map(),
     stop: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     ...overrides,
@@ -74,9 +74,9 @@ describe('start command', () => {
     await expect(runCommand([], dir)).rejects.toThrow('No boards configured')
   })
 
-  it('starts archiver manager with correct config', async () => {
+  it('starts board managers with correct config', async () => {
     const manager = makeMockManager({
-      archivers: new Map([['a.eth', { stop: vi.fn() }]]),
+      boardManagers: new Map([['a.eth', { stop: vi.fn() }]]),
     })
     mockStartManager.mockResolvedValue(manager)
 
@@ -96,7 +96,7 @@ describe('start command', () => {
 
   it('uses custom config path when --config flag provided', async () => {
     const manager = makeMockManager({
-      archivers: new Map([['a.eth', { stop: vi.fn() }]]),
+      boardManagers: new Map([['a.eth', { stop: vi.fn() }]]),
     })
     mockStartManager.mockResolvedValue(manager)
 
@@ -114,7 +114,7 @@ describe('start command', () => {
 
   it('prints startup summary', async () => {
     const manager = makeMockManager({
-      archivers: new Map([['a.eth', { stop: vi.fn() }]]),
+      boardManagers: new Map([['a.eth', { stop: vi.fn() }]]),
     })
     mockStartManager.mockResolvedValue(manager)
 
@@ -125,11 +125,11 @@ describe('start command', () => {
     }))
 
     const { stdout } = await runCommand([], dir)
-    expect(stdout).toContain('Starting archivers for 1 board(s)')
-    expect(stdout).toContain('Started 1 archiver(s)')
+    expect(stdout).toContain('Starting board managers for 1 board(s)')
+    expect(stdout).toContain('Started 1 board manager(s)')
   })
 
-  it('propagates error when startArchiverManager throws', async () => {
+  it('propagates error when startBoardManagers throws', async () => {
     mockStartManager.mockRejectedValue(
       new AggregateError(
         [new Error('connection refused')],
@@ -150,7 +150,7 @@ describe('start command', () => {
 
   it('reports failed boards in startup summary', async () => {
     const manager = makeMockManager({
-      archivers: new Map([['a.eth', { stop: vi.fn() }]]),
+      boardManagers: new Map([['a.eth', { stop: vi.fn() }]]),
       errors: new Map([['b.eth', new Error('connection refused')]]),
     })
     mockStartManager.mockResolvedValue(manager)

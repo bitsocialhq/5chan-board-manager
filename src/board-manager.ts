@@ -2,9 +2,9 @@ import Plebbit from '@plebbit/plebbit-js'
 import Logger from '@plebbit/plebbit-logger'
 import { join } from 'node:path'
 import { loadState, saveState, defaultStateDir, acquireLock } from './state.js'
-import type { ArchiverOptions, ArchiverResult, ArchiverState, Comment, FileLock, Subplebbit, Signer, ThreadComment, Page } from './types.js'
+import type { BoardManagerOptions, BoardManagerResult, BoardManagerState, Comment, FileLock, Subplebbit, Signer, ThreadComment, Page } from './types.js'
 
-const log = Logger('5chan-archiver')
+const log = Logger('5chan:board-manager:archiver')
 
 const DEFAULTS = {
   perPage: 15,
@@ -13,7 +13,7 @@ const DEFAULTS = {
   archivePurgeSeconds: 172800,
 } as const
 
-export async function startArchiver(options: ArchiverOptions): Promise<ArchiverResult> {
+export async function startBoardManager(options: BoardManagerOptions): Promise<BoardManagerResult> {
   const {
     subplebbitAddress,
     plebbitRpcUrl,
@@ -34,11 +34,11 @@ export async function startArchiver(options: ArchiverOptions): Promise<ArchiverR
     throw new Error(`${(err as Error).message} for ${subplebbitAddress}`)
   }
 
-  let state: ArchiverState = loadState(statePath)
+  let state: BoardManagerState = loadState(statePath)
 
   let stopped = false
 
-  log(`starting archiver for ${subplebbitAddress} (capacity=${maxThreads}, bumpLimit=${bumpLimit}, purgeAfter=${archivePurgeSeconds}s)`)
+  log(`starting board manager for ${subplebbitAddress} (capacity=${maxThreads}, bumpLimit=${bumpLimit}, purgeAfter=${archivePurgeSeconds}s)`)
 
   const plebbit = await Plebbit({ plebbitRpcClientsOptions: [plebbitRpcUrl] })
 
@@ -323,7 +323,7 @@ export async function startArchiver(options: ArchiverOptions): Promise<ArchiverR
 
   subplebbit.on('update', updateHandler)
   await subplebbit.update()
-  log(`archiver running for ${subplebbitAddress}`)
+  log(`board manager running for ${subplebbitAddress}`)
 
   return {
     async stop() {
@@ -333,7 +333,7 @@ export async function startArchiver(options: ArchiverOptions): Promise<ArchiverR
       fileLock.release()
       await subplebbit.stop?.()
       await plebbit.destroy()
-      log(`archiver stopped for ${subplebbitAddress}`)
+      log(`board manager stopped for ${subplebbitAddress}`)
     },
   }
 }

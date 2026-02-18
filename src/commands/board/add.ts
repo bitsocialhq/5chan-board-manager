@@ -12,7 +12,7 @@ export default class BoardAdd extends Command {
     }),
   }
 
-  static override description = 'Add a board to the archiver config'
+  static override description = 'Add a board to the config'
 
   static override examples = [
     '5chan board add random.eth',

@@ -32,7 +32,7 @@ The config file (`~/.config/5chan/config.json`) is managed via `5chan board add/
 ```json
 {
   "rpcUrl": "ws://localhost:9138",
-  "stateDir": "/data/5chan-archiver",
+  "stateDir": "/data/5chan-board-manager",
   "defaults": {
     "perPage": 15,
     "pages": 10,
@@ -124,12 +124,13 @@ docker run -d -v /path/to/data:/data 5chan-board-cli
 | Container path | Description |
 |---|---|
 | `/data/config.json` | Board configuration (create before first run, or use `5chan board add`) |
-| `/data/5chan-archiver/` | Per-board state files (auto-created) |
+| `/data/5chan-board-manager/` | Per-board state files (auto-created) |
 
 ## Commands
 
 <!-- commands -->
 * [`5chan board add ADDRESS`](#5chan-board-add-address)
+* [`5chan board edit ADDRESS`](#5chan-board-edit-address)
 * [`5chan board list`](#5chan-board-list)
 * [`5chan board remove ADDRESS`](#5chan-board-remove-address)
 * [`5chan help [COMMAND]`](#5chan-help-command)
@@ -137,7 +138,7 @@ docker run -d -v /path/to/data:/data 5chan-board-cli
 
 ## `5chan board add ADDRESS`
 
-Add a board to the archiver config
+Add a board to the config
 
 ```
 USAGE
@@ -145,7 +146,7 @@ USAGE
     [--archive-purge-seconds <value>]
 
 ARGUMENTS
-  ADDRESS  Board address to add
+  ADDRESS  Subplebbit address to add
 
 FLAGS
   --archive-purge-seconds=<value>  Seconds after archiving before purge
@@ -156,7 +157,7 @@ FLAGS
                                    (for validation)
 
 DESCRIPTION
-  Add a board to the archiver config
+  Add a board to the config
 
 EXAMPLES
   $ 5chan board add random.eth
@@ -170,16 +171,51 @@ EXAMPLES
 
 _See code: [src/commands/board/add.ts](https://github.com/plebbit/5chan_board_custom_community/blob/v0.1.0/src/commands/board/add.ts)_
 
+## `5chan board edit ADDRESS`
+
+Edit config for an existing board
+
+```
+USAGE
+  $ 5chan board edit ADDRESS [--per-page <value>] [--pages <value>] [--bump-limit <value>]
+    [--archive-purge-seconds <value>] [--reset <value>]
+
+ARGUMENTS
+  ADDRESS  Subplebbit address to edit
+
+FLAGS
+  --archive-purge-seconds=<value>  Seconds after archiving before purge
+  --bump-limit=<value>             Bump limit for threads
+  --pages=<value>                  Number of pages
+  --per-page=<value>               Posts per page
+  --reset=<value>                  Comma-separated fields to reset to defaults (per-page, pages, bump-limit,
+                                   archive-purge-seconds)
+
+DESCRIPTION
+  Edit config for an existing board
+
+EXAMPLES
+  $ 5chan board edit tech.eth --bump-limit 500
+
+  $ 5chan board edit flash.eth --per-page 30 --pages 1
+
+  $ 5chan board edit random.eth --reset per-page,bump-limit
+
+  $ 5chan board edit random.eth --per-page 20 --reset bump-limit
+```
+
+_See code: [src/commands/board/edit.ts](https://github.com/plebbit/5chan_board_custom_community/blob/v0.1.0/src/commands/board/edit.ts)_
+
 ## `5chan board list`
 
-List all boards in the archiver config
+List all boards in the config
 
 ```
 USAGE
   $ 5chan board list
 
 DESCRIPTION
-  List all boards in the archiver config
+  List all boards in the config
 
 EXAMPLES
   $ 5chan board list
@@ -189,17 +225,17 @@ _See code: [src/commands/board/list.ts](https://github.com/plebbit/5chan_board_c
 
 ## `5chan board remove ADDRESS`
 
-Remove a board from the archiver config
+Remove a board from the config
 
 ```
 USAGE
   $ 5chan board remove ADDRESS
 
 ARGUMENTS
-  ADDRESS  Board address to remove
+  ADDRESS  Subplebbit address to remove
 
 DESCRIPTION
-  Remove a board from the archiver config
+  Remove a board from the config
 
 EXAMPLES
   $ 5chan board remove random.eth
@@ -229,7 +265,7 @@ _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v6.2.3
 
 ## `5chan start`
 
-Start the archiver, watching the config file for changes
+Start board managers, watching the config file for changes
 
 ```
 USAGE
@@ -239,7 +275,7 @@ FLAGS
   -c, --config=<value>  Path to config file (overrides default)
 
 DESCRIPTION
-  Start the archiver, watching the config file for changes
+  Start board managers, watching the config file for changes
 
 EXAMPLES
   $ 5chan start
@@ -256,27 +292,27 @@ _See code: [src/commands/start.ts](https://github.com/plebbit/5chan_board_custom
 
 1. Loads and validates the new config
 2. Diffs old vs new boards
-3. Stops archivers for removed boards
-4. Restarts archivers for boards with changed config
-5. Starts archivers for added boards
+3. Stops board managers for removed boards
+4. Restarts board managers for boards with changed config
+5. Starts board managers for added boards
 6. Logs the delta: `config reloaded: +N added, -N removed, ~N changed, M running`
 
-This means you can add, edit, or remove boards while the archiver is running — either by editing the config file directly or by running `5chan board add/edit/remove` in another terminal.
+This means you can add, edit, or remove boards while the board manager is running — either by editing the config file directly or by running `5chan board add/edit/remove` in another terminal.
 
 ## File Locking
 
-Each archiver acquires a PID-based lock file (`{statePath}.lock`) to prevent concurrent archivers on the same board. On startup:
+Each board manager acquires a PID-based lock file (`{statePath}.lock`) to prevent concurrent board managers on the same board. On startup:
 
 1. Attempts to create lock file exclusively (`wx` flag)
 2. If lock exists, reads the PID and checks if it's still alive (`process.kill(pid, 0)`)
-3. If alive — throws `Another archiver (PID N) is already running`
+3. If alive — throws `Another board manager (PID N) is already running`
 4. If stale — removes the old lock and retries
 
-The lock is released when the archiver stops.
+The lock is released when the board manager stops.
 
 ## Author-Deleted Comment Purging
 
-The archiver detects comments and replies that were deleted by their author (where `comment.deleted === true`) and purges them via `createCommentModeration({ commentModeration: { purged: true } })`. Once purged, the comment is removed from the board and won't appear in future listings. If a purge hasn't been processed yet, the next cycle may re-publish a redundant purge moderation, which is a harmless no-op.
+The board manager detects comments and replies that were deleted by their author (where `comment.deleted === true`) and purges them via `createCommentModeration({ commentModeration: { purged: true } })`. Once purged, the comment is removed from the board and won't appear in future listings. If a purge hasn't been processed yet, the next cycle may re-publish a redundant purge moderation, which is a harmless no-op.
 
 ## Auto Mod Signer Management
 
@@ -291,7 +327,7 @@ Logged via `plebbit-logger` when creating signer or adding mod role.
 
 ## State Persistence
 
-State is stored as one JSON file per board in the state directory (via `env-paths`: `~/.local/share/5chan-archiver/5chan_archiver_states/{address}.json`) or a custom directory via `stateDir` in the config.
+State is stored as one JSON file per board in the state directory (via `env-paths`: `~/.local/share/5chan-board-manager/5chan_board_manager_states/{address}.json`) or a custom directory via `stateDir` in the config.
 
 ```json
 {
@@ -321,7 +357,7 @@ Before archiving, checks the thread's `archived` property. Skips if already arch
 
 Uses `plebbit-logger` (same logger as the plebbit-js ecosystem). Key events logged:
 
-- Archiver start/stop
+- Board manager start/stop
 - Threads archived (with CID and reason: capacity vs bump limit)
 - Threads purged
 - Author-deleted comments purged
@@ -423,7 +459,7 @@ The entire board IPFS record is capped at 1MB (`MAX_FILE_SIZE_BYTES_FOR_SUBPLEBB
 
 - If the preloaded page has **no `nextCid`**, it contains all posts — no pagination needed
 - If `nextCid` **is present**, additional pages must be fetched via `subplebbit.posts.getPage({ cid: nextCid })`
-- `subplebbit.posts.pageCids.active` provides the CID of the first active-sorted page, which is the sort order the archiver needs
+- `subplebbit.posts.pageCids.active` provides the CID of the first active-sorted page, which is the sort order the board manager needs
 
 Reference: `plebbit-js/src/subplebbit/subplebbit-client-manager.ts:38`, `plebbit-js/src/runtime/node/subplebbit/local-subplebbit.ts:714`
 
@@ -434,7 +470,7 @@ Reference: `plebbit-js/src/subplebbit/subplebbit-client-manager.ts:38`, `plebbit
 2. Load state JSON; get or create signer for this board via `plebbit.createSigner()`
 3. Get board (`LocalSubplebbit` or `RpcLocalSubplebbit`)
 4. Check board roles via `subplebbit.roles`; if missing, call `subplebbit.edit()` to add as mod
-5. Acquire file lock to prevent concurrent archivers on same board
+5. Acquire file lock to prevent concurrent board managers on same board
 6. Call `subplebbit.update()`
 7. On each 'update' event:
    a. Determine thread source (three scenarios):

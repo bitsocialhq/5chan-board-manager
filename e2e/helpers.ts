@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import Plebbit from '@plebbit/plebbit-js'
 import { loadState } from '../src/state.js'
-import type { PlebbitInstance, Subplebbit, ArchiverState, Page, ThreadComment } from '../src/types.js'
+import type { PlebbitInstance, Subplebbit, BoardManagerState, Page, ThreadComment } from '../src/types.js'
 
 export const RPC_URL = 'ws://localhost:9138'
 
@@ -272,7 +272,7 @@ export async function waitForPurgedFromState(statePath: string, cid: string, tim
   })
 }
 
-/** Wait until the archiver signer appears in the state file for a given subplebbit address */
+/** Wait until the board manager signer appears in the state file for a given subplebbit address */
 export async function waitForSignerInState(statePath: string, subAddress: string, timeoutMs = 120_000): Promise<void> {
   const start = Date.now()
   return new Promise<void>((resolve, reject) => {
@@ -292,7 +292,7 @@ export async function waitForSignerInState(statePath: string, subAddress: string
 }
 
 export function createTempStateDir(): { dir: string; statePath: string } {
-  const dir = mkdtempSync(join(tmpdir(), 'archiver-e2e-'))
+  const dir = mkdtempSync(join(tmpdir(), 'board-manager-e2e-'))
   const statePath = join(dir, 'state.json')
   return { dir, statePath }
 }
@@ -301,7 +301,7 @@ export function cleanupTempDir(dir: string): void {
   rmSync(dir, { recursive: true, force: true })
 }
 
-export function readStateFile(statePath: string): ArchiverState {
+export function readStateFile(statePath: string): BoardManagerState {
   return loadState(statePath)
 }
 

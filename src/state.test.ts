@@ -3,14 +3,14 @@ import { mkdtempSync, rmSync, readFileSync, existsSync, writeFileSync } from 'no
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { loadState, saveState, defaultStateDir, isPidAlive, acquireLock } from './state.js'
-import type { ArchiverState } from './types.js'
+import type { BoardManagerState } from './types.js'
 
 describe('state', () => {
   let dir: string
   let statePath: string
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'archiver-test-'))
+    dir = mkdtempSync(join(tmpdir(), 'board-manager-test-'))
     statePath = join(dir, 'state.json')
   })
 
@@ -25,7 +25,7 @@ describe('state', () => {
     })
 
     it('loads existing state from file', () => {
-      const existing: ArchiverState = {
+      const existing: BoardManagerState = {
         signers: { 'sub1.eth': { privateKey: 'pk123' } },
         archivedThreads: { 'Qm123': { archivedTimestamp: 1000 } },
       }
@@ -44,7 +44,7 @@ describe('state', () => {
 
   describe('saveState', () => {
     it('writes state as JSON', () => {
-      const state: ArchiverState = {
+      const state: BoardManagerState = {
         signers: { 'board.eth': { privateKey: 'abc' } },
         archivedThreads: {},
       }
@@ -54,13 +54,13 @@ describe('state', () => {
     })
 
     it('overwrites previous state', () => {
-      const state1: ArchiverState = {
+      const state1: BoardManagerState = {
         signers: {},
         archivedThreads: { 'Qm1': { archivedTimestamp: 100 } },
       }
       saveState(statePath, state1)
 
-      const state2: ArchiverState = {
+      const state2: BoardManagerState = {
         signers: {},
         archivedThreads: { 'Qm2': { archivedTimestamp: 200 } },
       }
@@ -72,7 +72,7 @@ describe('state', () => {
     })
 
     it('preserves both signers and archivedThreads', () => {
-      const state: ArchiverState = {
+      const state: BoardManagerState = {
         signers: {
           'sub1.eth': { privateKey: 'key1' },
           'sub2.eth': { privateKey: 'key2' },
@@ -90,7 +90,7 @@ describe('state', () => {
 
     it('auto-creates missing parent directories', () => {
       const nestedPath = join(dir, 'a', 'b', 'c', 'state.json')
-      const state: ArchiverState = { signers: {}, archivedThreads: {} }
+      const state: BoardManagerState = { signers: {}, archivedThreads: {} }
       saveState(nestedPath, state)
 
       expect(existsSync(nestedPath)).toBe(true)
@@ -101,14 +101,14 @@ describe('state', () => {
 
   describe('saveState atomic write', () => {
     it('does not leave a .tmp file after successful write', () => {
-      const state: ArchiverState = { signers: {}, archivedThreads: {} }
+      const state: BoardManagerState = { signers: {}, archivedThreads: {} }
       saveState(statePath, state)
       expect(existsSync(statePath + '.tmp')).toBe(false)
       expect(existsSync(statePath)).toBe(true)
     })
 
     it('preserves original state when a leftover .tmp file exists', () => {
-      const state: ArchiverState = {
+      const state: BoardManagerState = {
         signers: { 'x.eth': { privateKey: 'original' } },
         archivedThreads: {},
       }
@@ -124,7 +124,7 @@ describe('state', () => {
     it('overwrites leftover .tmp on next successful save', () => {
       writeFileSync(statePath + '.tmp', 'garbage')
 
-      const state: ArchiverState = { signers: {}, archivedThreads: {} }
+      const state: BoardManagerState = { signers: {}, archivedThreads: {} }
       saveState(statePath, state)
 
       expect(existsSync(statePath + '.tmp')).toBe(false)
@@ -154,7 +154,7 @@ describe('state', () => {
     it('throws when live process holds lock', () => {
       const lock = acquireLock(statePath)
       expect(() => acquireLock(statePath)).toThrow(
-        `Another archiver (PID ${process.pid}) is already running`
+        `Another board manager (PID ${process.pid}) is already running`
       )
       lock.release()
     })
@@ -191,10 +191,10 @@ describe('state', () => {
   })
 
   describe('defaultStateDir', () => {
-    it('returns a directory path under 5chan-archiver data dir', () => {
+    it('returns a directory path under 5chan-board-manager data dir', () => {
       const dir = defaultStateDir()
-      expect(dir).toMatch(/5chan-archiver/)
-      expect(dir).toMatch(/5chan_archiver_states$/)
+      expect(dir).toMatch(/5chan-board-manager/)
+      expect(dir).toMatch(/5chan_board_manager_states$/)
     })
   })
 })

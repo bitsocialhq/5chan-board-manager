@@ -1,48 +1,48 @@
 import { watch, type FSWatcher } from 'node:fs'
 import Logger from '@plebbit/plebbit-logger'
-import { startArchiver } from './archiver.js'
+import { startBoardManager } from './board-manager.js'
 import { loadConfig, diffBoards } from './config-manager.js'
-import { resolveArchiverOptions } from './multi-config.js'
-import type { ArchiverResult, MultiArchiverConfig } from './types.js'
+import { resolveBoardManagerOptions } from './multi-config.js'
+import type { BoardManagerResult, MultiBoardConfig } from './types.js'
 
-const log = Logger('5chan:manager')
+const log = Logger('5chan:board-manager')
 
-export interface ArchiverManager {
-  readonly archivers: ReadonlyMap<string, ArchiverResult>
+export interface BoardManagers {
+  readonly boardManagers: ReadonlyMap<string, BoardManagerResult>
   readonly errors: ReadonlyMap<string, Error>
   stop(): Promise<void>
 }
 
 /**
- * Start an archiver manager that watches the config file for changes.
- * On config change, diffs the old and new config, stops removed archivers,
- * and starts added archivers.
+ * Start board managers that watch the config file for changes.
+ * On config change, diffs the old and new config, stops removed board managers,
+ * and starts added board managers.
  */
-export async function startArchiverManager(
+export async function startBoardManagers(
   configPath: string,
-  initialConfig: MultiArchiverConfig,
-): Promise<ArchiverManager> {
-  const archivers = new Map<string, ArchiverResult>()
+  initialConfig: MultiBoardConfig,
+): Promise<BoardManagers> {
+  const boardManagers = new Map<string, BoardManagerResult>()
   const errors = new Map<string, Error>()
   let currentConfig = initialConfig
   let reloading = false
   let stopped = false
 
-  // Start initial archivers sequentially
+  // Start initial board managers sequentially
   for (const board of initialConfig.boards) {
-    const options = resolveArchiverOptions(board, initialConfig)
+    const options = resolveBoardManagerOptions(board, initialConfig)
     try {
-      log(`starting archiver for ${board.address}`)
-      const result = await startArchiver(options)
-      archivers.set(board.address, result)
+      log(`starting board manager for ${board.address}`)
+      const result = await startBoardManager(options)
+      boardManagers.set(board.address, result)
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err))
-      log.error(`failed to start archiver for ${board.address}: ${error.message}`)
+      log.error(`failed to start board manager for ${board.address}: ${error.message}`)
       errors.set(board.address, error)
     }
   }
 
-  if (archivers.size === 0 && errors.size > 0) {
+  if (boardManagers.size === 0 && errors.size > 0) {
     throw new AggregateError(
       [...errors.values()],
       `All ${errors.size} board(s) failed to start`,
@@ -54,7 +54,7 @@ export async function startArchiverManager(
     reloading = true
 
     try {
-      let newConfig: MultiArchiverConfig
+      let newConfig: MultiBoardConfig
       try {
         newConfig = loadConfig(configPath)
       } catch (err) {
@@ -69,58 +69,58 @@ export async function startArchiverManager(
         return
       }
 
-      // Stop removed archivers
+      // Stop removed board managers
       for (const address of removed) {
-        const archiver = archivers.get(address)
-        if (archiver) {
+        const manager = boardManagers.get(address)
+        if (manager) {
           try {
-            log(`stopping archiver for removed board ${address}`)
-            await archiver.stop()
+            log(`stopping board manager for removed board ${address}`)
+            await manager.stop()
           } catch (err) {
-            log.error(`failed to stop archiver for ${address}: ${err}`)
+            log.error(`failed to stop board manager for ${address}: ${err}`)
           }
-          archivers.delete(address)
+          boardManagers.delete(address)
         }
         errors.delete(address)
       }
 
-      // Restart changed archivers
+      // Restart changed board managers
       for (const board of changed) {
-        const archiver = archivers.get(board.address)
-        if (archiver) {
+        const manager = boardManagers.get(board.address)
+        if (manager) {
           try {
-            log(`stopping archiver for changed board ${board.address}`)
-            await archiver.stop()
+            log(`stopping board manager for changed board ${board.address}`)
+            await manager.stop()
           } catch (err) {
-            log.error(`failed to stop archiver for ${board.address}: ${err}`)
+            log.error(`failed to stop board manager for ${board.address}: ${err}`)
           }
-          archivers.delete(board.address)
+          boardManagers.delete(board.address)
         }
         errors.delete(board.address)
 
-        const options = resolveArchiverOptions(board, newConfig)
+        const options = resolveBoardManagerOptions(board, newConfig)
         try {
-          log(`starting archiver for changed board ${board.address}`)
-          const result = await startArchiver(options)
-          archivers.set(board.address, result)
+          log(`starting board manager for changed board ${board.address}`)
+          const result = await startBoardManager(options)
+          boardManagers.set(board.address, result)
         } catch (err) {
           const error = err instanceof Error ? err : new Error(String(err))
-          log.error(`failed to start archiver for ${board.address}: ${error.message}`)
+          log.error(`failed to start board manager for ${board.address}: ${error.message}`)
           errors.set(board.address, error)
         }
       }
 
-      // Start added archivers
+      // Start added board managers
       for (const board of added) {
-        const options = resolveArchiverOptions(board, newConfig)
+        const options = resolveBoardManagerOptions(board, newConfig)
         try {
-          log(`starting archiver for added board ${board.address}`)
-          const result = await startArchiver(options)
-          archivers.set(board.address, result)
+          log(`starting board manager for added board ${board.address}`)
+          const result = await startBoardManager(options)
+          boardManagers.set(board.address, result)
           errors.delete(board.address)
         } catch (err) {
           const error = err instanceof Error ? err : new Error(String(err))
-          log.error(`failed to start archiver for ${board.address}: ${error.message}`)
+          log.error(`failed to start board manager for ${board.address}: ${error.message}`)
           errors.set(board.address, error)
         }
       }
@@ -128,7 +128,7 @@ export async function startArchiverManager(
       currentConfig = newConfig
 
       if (added.length > 0 || removed.length > 0 || changed.length > 0) {
-        log(`config reloaded: +${added.length} added, -${removed.length} removed, ~${changed.length} changed, ${archivers.size} running`)
+        log(`config reloaded: +${added.length} added, -${removed.length} removed, ~${changed.length} changed, ${boardManagers.size} running`)
       }
     } finally {
       reloading = false
@@ -152,8 +152,8 @@ export async function startArchiverManager(
   }
 
   return {
-    get archivers() {
-      return archivers as ReadonlyMap<string, ArchiverResult>
+    get boardManagers() {
+      return boardManagers as ReadonlyMap<string, BoardManagerResult>
     },
     get errors() {
       return errors as ReadonlyMap<string, Error>
@@ -165,18 +165,18 @@ export async function startArchiverManager(
         watcher.close()
       }
       const results = await Promise.allSettled(
-        [...archivers.entries()].map(async ([address, archiver]) => {
+        [...boardManagers.entries()].map(async ([address, manager]) => {
           try {
-            await archiver.stop()
+            await manager.stop()
           } catch (err) {
-            log.error(`error stopping archiver for ${address}: ${err}`)
+            log.error(`error stopping board manager for ${address}: ${err}`)
             throw err
           }
         }),
       )
       const failures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
       if (failures.length > 0) {
-        log.error(`${failures.length} archiver(s) failed to stop cleanly`)
+        log.error(`${failures.length} board manager(s) failed to stop cleanly`)
       }
     },
   }

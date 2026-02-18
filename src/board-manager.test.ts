@@ -3,9 +3,9 @@ import { mkdtempSync, mkdirSync, rmSync, existsSync, writeFileSync } from 'node:
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { loadState, saveState } from './state.js'
-import type { ArchiverState, PlebbitInstance, Page, ThreadComment } from './types.js'
+import type { BoardManagerState, PlebbitInstance, Page, ThreadComment } from './types.js'
 import Plebbit from '@plebbit/plebbit-js'
-import { startArchiver } from './archiver.js'
+import { startBoardManager } from './board-manager.js'
 
 vi.mock('@plebbit/plebbit-js')
 
@@ -76,12 +76,12 @@ function createMockSubplebbit(postsConfig: {
   }
 }
 
-describe('archiver logic', () => {
+describe('board manager logic', () => {
   let dir: string
   let stateDir: string
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'archiver-test-'))
+    dir = mkdtempSync(join(tmpdir(), 'board-manager-test-'))
     stateDir = join(dir, 'states')
   })
 
@@ -92,7 +92,7 @@ describe('archiver logic', () => {
   describe('state-based thread tracking', () => {
     it('records archivedTimestamp when adding an archived thread', () => {
       const filePath = join(stateDir, 'test.json')
-      const state: ArchiverState = { signers: {}, archivedThreads: {} }
+      const state: BoardManagerState = { signers: {}, archivedThreads: {} }
       const now = Math.floor(Date.now() / 1000)
       state.archivedThreads['QmTest'] = { archivedTimestamp: now }
       saveState(filePath, state)
@@ -103,7 +103,7 @@ describe('archiver logic', () => {
 
     it('removes thread from state on purge', () => {
       const filePath = join(stateDir, 'test.json')
-      const state: ArchiverState = {
+      const state: BoardManagerState = {
         signers: {},
         archivedThreads: {
           'QmKeep': { archivedTimestamp: 1000 },
@@ -223,7 +223,7 @@ describe('archiver logic', () => {
     it('identifies threads past archive_purge_seconds', () => {
       const archivePurgeSeconds = 172800 // 48h
       const now = Math.floor(Date.now() / 1000)
-      const state: ArchiverState = {
+      const state: BoardManagerState = {
         signers: {},
         archivedThreads: {
           'QmOld': { archivedTimestamp: now - 200000 }, // > 48h ago
@@ -241,7 +241,7 @@ describe('archiver logic', () => {
     it('does not purge threads archived less than archive_purge_seconds ago', () => {
       const archivePurgeSeconds = 172800
       const now = Math.floor(Date.now() / 1000)
-      const state: ArchiverState = {
+      const state: BoardManagerState = {
         signers: {},
         archivedThreads: {
           'Qm1': { archivedTimestamp: now - 100 },
@@ -258,7 +258,7 @@ describe('archiver logic', () => {
   describe('signer management', () => {
     it('persists signer to state file', () => {
       const filePath = join(stateDir, 'test.json')
-      const state: ArchiverState = { signers: {}, archivedThreads: {} }
+      const state: BoardManagerState = { signers: {}, archivedThreads: {} }
       state.signers['my-board.eth'] = { privateKey: 'test-private-key' }
       saveState(filePath, state)
 
@@ -268,7 +268,7 @@ describe('archiver logic', () => {
 
     it('retrieves existing signer from state', () => {
       const filePath = join(stateDir, 'test.json')
-      const state: ArchiverState = {
+      const state: BoardManagerState = {
         signers: { 'board.eth': { privateKey: 'existing-key' } },
         archivedThreads: {},
       }
@@ -281,7 +281,7 @@ describe('archiver logic', () => {
 
     it('handles multiple signers for different subplebbits', () => {
       const filePath = join(stateDir, 'test.json')
-      const state: ArchiverState = {
+      const state: BoardManagerState = {
         signers: {
           'board1.eth': { privateKey: 'key1' },
           'board2.eth': { privateKey: 'key2' },
@@ -299,7 +299,7 @@ describe('archiver logic', () => {
 
   describe('idempotency', () => {
     it('skips threads already tracked in archivedThreads state', () => {
-      const state: ArchiverState = {
+      const state: BoardManagerState = {
         signers: {},
         archivedThreads: { 'QmAlready': { archivedTimestamp: 1000 } },
       }
@@ -321,7 +321,7 @@ describe('archiver logic', () => {
       const pages = 1
       const maxThreads = perPage * pages // 2
 
-      // Simulate 50 threads on a board that's been running without archiver
+      // Simulate 50 threads on a board that's been running without board manager
       const threads = Array.from({ length: 50 }, (_, i) => mockThread(`Qm${i}`))
       const nonPinned = threads.filter((t) => !t.pinned)
       const beyondCapacity = nonPinned.slice(maxThreads)
@@ -383,7 +383,7 @@ describe('archiver logic', () => {
       })
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      const archiver = await startArchiver({
+      const boardManager = await startBoardManager({
         subplebbitAddress: 'board.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
@@ -393,7 +393,7 @@ describe('archiver logic', () => {
 
       // No moderations should have been published
       expect(publishedModerations).toHaveLength(0)
-      await archiver.stop()
+      await boardManager.stop()
     })
 
     it('fetches all threads via pageCids.active with single page', async () => {
@@ -411,7 +411,7 @@ describe('archiver logic', () => {
       })
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      const archiver = await startArchiver({
+      const boardManager = await startBoardManager({
         subplebbitAddress: 'board.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
@@ -428,7 +428,7 @@ describe('archiver logic', () => {
 
       const archivedCids = publishedModerations.map((m) => m.commentCid)
       expect(archivedCids).toEqual(['QmActive2', 'QmActive3', 'QmActive4'])
-      await archiver.stop()
+      await boardManager.stop()
     })
 
     it('paginates via nextCid when multiple pages exist', async () => {
@@ -447,7 +447,7 @@ describe('archiver logic', () => {
       })
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      const archiver = await startArchiver({
+      const boardManager = await startBoardManager({
         subplebbitAddress: 'board.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
@@ -467,7 +467,7 @@ describe('archiver logic', () => {
 
       const archivedCids = publishedModerations.map((m) => m.commentCid)
       expect(archivedCids).toEqual(['QmP1b', 'QmP2a', 'QmP2b'])
-      await archiver.stop()
+      await boardManager.stop()
     })
 
     it('falls back to preloaded hot page when pageCids.active is absent', async () => {
@@ -488,7 +488,7 @@ describe('archiver logic', () => {
       })
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      const archiver = await startArchiver({
+      const boardManager = await startBoardManager({
         subplebbitAddress: 'board.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
@@ -504,7 +504,7 @@ describe('archiver logic', () => {
       // Capacity 2 → QmHot2 and QmHot3 get archived
       const archivedCids = publishedModerations.map((m) => m.commentCid)
       expect(archivedCids).toEqual(['QmHot2', 'QmHot3'])
-      await archiver.stop()
+      await boardManager.stop()
     })
 
     it('paginates hot pages via nextCid when pageCids.active is absent', async () => {
@@ -534,7 +534,7 @@ describe('archiver logic', () => {
       })
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      const archiver = await startArchiver({
+      const boardManager = await startBoardManager({
         subplebbitAddress: 'board.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
@@ -552,7 +552,7 @@ describe('archiver logic', () => {
 
       const archivedCids = publishedModerations.map((m) => m.commentCid)
       expect(archivedCids).toEqual(['QmH2', 'QmH3', 'QmH4'])
-      await archiver.stop()
+      await boardManager.stop()
     })
 
     it('throws for remote subplebbit when signer has no mod role', async () => {
@@ -568,7 +568,7 @@ describe('archiver logic', () => {
       ;(mockSub as unknown as { roles: Record<string, unknown> }).roles = {}
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      await expect(startArchiver({
+      await expect(startBoardManager({
         subplebbitAddress: 'board.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
@@ -590,7 +590,7 @@ describe('archiver logic', () => {
       mockSub.roles = { 'mock-address-123': { role: 'moderator' as const } }
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      const archiver = await startArchiver({
+      const boardManager = await startBoardManager({
         subplebbitAddress: 'board.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
@@ -598,7 +598,7 @@ describe('archiver logic', () => {
 
       // Should not have called edit (role already exists)
       expect(mockSub.edit).not.toHaveBeenCalled()
-      await archiver.stop()
+      await boardManager.stop()
     })
 
     it('auto-grants mod role for local subplebbit without mod role', async () => {
@@ -614,7 +614,7 @@ describe('archiver logic', () => {
       ;(mockSub as unknown as { roles: Record<string, unknown> }).roles = {}
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      const archiver = await startArchiver({
+      const boardManager = await startBoardManager({
         subplebbitAddress: 'board.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
@@ -624,7 +624,7 @@ describe('archiver logic', () => {
       expect(mockSub.edit).toHaveBeenCalledWith({
         roles: { 'mock-address-123': { role: 'moderator' } },
       })
-      await archiver.stop()
+      await boardManager.stop()
     })
 
     it('uses defaultStateDir when stateDir is not provided', async () => {
@@ -636,7 +636,7 @@ describe('archiver logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       // No stateDir passed — should use defaultStateDir() without error
-      const archiver = await startArchiver({
+      const boardManager = await startBoardManager({
         subplebbitAddress: 'board.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         perPage: 15,
@@ -645,7 +645,7 @@ describe('archiver logic', () => {
 
       expect(mockSub.update).toHaveBeenCalled()
 
-      await archiver.stop()
+      await boardManager.stop()
     })
   })
 
@@ -672,7 +672,7 @@ describe('archiver logic', () => {
       })
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      const archiver = await startArchiver({
+      const boardManager = await startBoardManager({
         subplebbitAddress: 'board.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
@@ -709,7 +709,7 @@ describe('archiver logic', () => {
       // NOT 3 times (which would indicate no coalescing)
       expect(getPageCalls).toHaveLength(2)
 
-      await archiver.stop()
+      await boardManager.stop()
     })
 
     it('does not re-run when no update arrives during handleUpdate', async () => {
@@ -727,7 +727,7 @@ describe('archiver logic', () => {
       })
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      const archiver = await startArchiver({
+      const boardManager = await startBoardManager({
         subplebbitAddress: 'board.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
@@ -744,7 +744,7 @@ describe('archiver logic', () => {
       await new Promise((r) => setTimeout(r, 50))
       expect(getPageCalls).toHaveLength(1)
 
-      await archiver.stop()
+      await boardManager.stop()
     })
   })
 
@@ -758,11 +758,11 @@ describe('archiver logic', () => {
       const mockSub = createMockSubplebbit({ pageCids: {}, pages: {} })
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      await expect(startArchiver({
+      await expect(startBoardManager({
         subplebbitAddress: 'board.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
-      })).rejects.toThrow(`Another archiver (PID ${process.pid}) is already running for board.eth`)
+      })).rejects.toThrow(`Another board manager (PID ${process.pid}) is already running for board.eth`)
     })
 
     it('succeeds when lock has stale PID', async () => {
@@ -774,14 +774,14 @@ describe('archiver logic', () => {
       const mockSub = createMockSubplebbit({ pageCids: {}, pages: {} })
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      const archiver = await startArchiver({
+      const boardManager = await startBoardManager({
         subplebbitAddress: 'board.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
       })
 
       expect(existsSync(lockPath)).toBe(true)
-      await archiver.stop()
+      await boardManager.stop()
     })
 
     it('releases lock on stop()', async () => {
@@ -789,7 +789,7 @@ describe('archiver logic', () => {
       const mockSub = createMockSubplebbit({ pageCids: {}, pages: {} })
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      const archiver = await startArchiver({
+      const boardManager = await startBoardManager({
         subplebbitAddress: 'board.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
@@ -798,7 +798,7 @@ describe('archiver logic', () => {
       const lockPath = join(stateDir, 'board.eth.json.lock')
       expect(existsSync(lockPath)).toBe(true)
 
-      await archiver.stop()
+      await boardManager.stop()
 
       expect(existsSync(lockPath)).toBe(false)
     })
@@ -810,13 +810,13 @@ describe('archiver logic', () => {
 
       const lockPath = join(stateDir, 'board.eth.json.lock')
 
-      const archiver1 = await startArchiver({
+      const boardManager1 = await startBoardManager({
         subplebbitAddress: 'board.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
       })
       expect(existsSync(lockPath)).toBe(true)
-      await archiver1.stop()
+      await boardManager1.stop()
       expect(existsSync(lockPath)).toBe(false)
 
       // Re-mock Plebbit for second call since mock is consumed
@@ -824,13 +824,13 @@ describe('archiver logic', () => {
       const mockSub2 = createMockSubplebbit({ pageCids: {}, pages: {} })
       vi.mocked(instance2.getSubplebbit).mockResolvedValue(mockSub2 as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      const archiver2 = await startArchiver({
+      const boardManager2 = await startBoardManager({
         subplebbitAddress: 'board.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
       })
       expect(existsSync(lockPath)).toBe(true)
-      await archiver2.stop()
+      await boardManager2.stop()
       expect(existsSync(lockPath)).toBe(false)
     })
   })
@@ -854,7 +854,7 @@ describe('archiver logic', () => {
       })
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      const archiver = await startArchiver({
+      const boardManager = await startBoardManager({
         subplebbitAddress: 'board.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
@@ -881,7 +881,7 @@ describe('archiver logic', () => {
           subplebbitAddress: 'board.eth',
         })
       )
-      await archiver.stop()
+      await boardManager.stop()
     })
 
     it('purges a deleted reply in preloaded replies.pages', async () => {
@@ -914,7 +914,7 @@ describe('archiver logic', () => {
       })
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      const archiver = await startArchiver({
+      const boardManager = await startBoardManager({
         subplebbitAddress: 'board.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
@@ -932,7 +932,7 @@ describe('archiver logic', () => {
       expect(purges[0].subplebbitAddress).toBe('board.eth')
       expect(purges[0].signer).toBeDefined()
       expect(purges[0].commentModeration).toEqual({ purged: true })
-      await archiver.stop()
+      await boardManager.stop()
     })
 
     it('cleans up archivedThreads when deleted thread is purged', async () => {
@@ -959,7 +959,7 @@ describe('archiver logic', () => {
         archivedThreads: { 'QmArchived': { archivedTimestamp: Math.floor(Date.now() / 1000) } },
       })
 
-      const archiver = await startArchiver({
+      const boardManager = await startBoardManager({
         subplebbitAddress: 'board.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
@@ -974,7 +974,7 @@ describe('archiver logic', () => {
 
       const loaded = loadState(statePath)
       expect(loaded.archivedThreads['QmArchived']).toBeUndefined()
-      await archiver.stop()
+      await boardManager.stop()
     })
 
     it('purges deleted pinned threads', async () => {
@@ -995,7 +995,7 @@ describe('archiver logic', () => {
       })
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      const archiver = await startArchiver({
+      const boardManager = await startBoardManager({
         subplebbitAddress: 'board.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
@@ -1010,14 +1010,14 @@ describe('archiver logic', () => {
 
       const purges = publishedModerations.filter((m) => m.commentModeration.purged === true)
       expect(purges[0].commentCid).toBe('QmPinned')
-      await archiver.stop()
+      await boardManager.stop()
     })
 
   })
 
   describe('per-subplebbit state isolation', () => {
-    it('two archivers for different subplebbits use separate state files', async () => {
-      // First archiver for board1.eth
+    it('two board managers for different subplebbits use separate state files', async () => {
+      // First board manager for board1.eth
       const { instance: instance1 } = createMockPlebbit()
       const mockSub1 = createMockSubplebbit({
         pageCids: { active: 'QmPage1' },
@@ -1029,7 +1029,7 @@ describe('archiver logic', () => {
       })
       vi.mocked(instance1.getSubplebbit).mockResolvedValue(mockSub1 as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      const archiver1 = await startArchiver({
+      const boardManager1 = await startBoardManager({
         subplebbitAddress: 'board1.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
@@ -1037,7 +1037,7 @@ describe('archiver logic', () => {
         pages: 10,
       })
 
-      // Second archiver for board2.eth
+      // Second board manager for board2.eth
       const { instance: instance2 } = createMockPlebbit()
       const mockSub2 = createMockSubplebbit({
         pageCids: { active: 'QmPage2' },
@@ -1049,7 +1049,7 @@ describe('archiver logic', () => {
       })
       vi.mocked(instance2.getSubplebbit).mockResolvedValue(mockSub2 as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      const archiver2 = await startArchiver({
+      const boardManager2 = await startBoardManager({
         subplebbitAddress: 'board2.eth',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
@@ -1057,7 +1057,7 @@ describe('archiver logic', () => {
         pages: 10,
       })
 
-      // Wait for both archivers to process
+      // Wait for both board managers to process
       await vi.waitFor(() => {
         expect(existsSync(join(stateDir, 'board1.eth.json'))).toBe(true)
         expect(existsSync(join(stateDir, 'board2.eth.json'))).toBe(true)
@@ -1074,8 +1074,8 @@ describe('archiver logic', () => {
       expect(state1.signers['board2.eth']).toBeUndefined()
       expect(state2.signers['board1.eth']).toBeUndefined()
 
-      await archiver1.stop()
-      await archiver2.stop()
+      await boardManager1.stop()
+      await boardManager2.stop()
     })
   })
 })

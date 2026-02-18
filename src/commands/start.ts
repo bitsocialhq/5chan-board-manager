@@ -1,10 +1,10 @@
 import { Command, Flags } from '@oclif/core'
 import { join } from 'node:path'
 import { loadConfig } from '../config-manager.js'
-import { startArchiverManager } from '../archiver-manager.js'
+import { startBoardManagers } from '../board-managers.js'
 
 export default class Start extends Command {
-  static override description = 'Start the archiver, watching the config file for changes'
+  static override description = 'Start board managers, watching the config file for changes'
 
   static override examples = [
     '5chan start',
@@ -28,15 +28,15 @@ export default class Start extends Command {
       this.error('No boards configured. Use "5chan board add <address>" to add boards first.')
     }
 
-    this.log(`Starting archivers for ${config.boards.length} board(s)...`)
+    this.log(`Starting board managers for ${config.boards.length} board(s)...`)
     this.log(`Config: ${configPath}`)
     this.log(`Watching config file for changes`)
 
-    const manager = await startArchiverManager(configPath, config)
+    const manager = await startBoardManagers(configPath, config)
 
-    const started = manager.archivers.size
+    const started = manager.boardManagers.size
     const failed = manager.errors.size
-    this.log(`Started ${started} archiver(s)${failed > 0 ? `, ${failed} failed` : ''}`)
+    this.log(`Started ${started} board manager(s)${failed > 0 ? `, ${failed} failed` : ''}`)
     for (const [address, err] of manager.errors) {
       this.warn(`FAILED: ${address} — ${err.message}`)
     }

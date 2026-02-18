@@ -2,26 +2,26 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { startArchiverManager } from './archiver-manager.js'
-import type { ArchiverOptions, ArchiverResult, MultiArchiverConfig } from './types.js'
+import { startBoardManagers } from './board-managers.js'
+import type { BoardManagerOptions, BoardManagerResult, MultiBoardConfig } from './types.js'
 
-vi.mock('./archiver.js', () => ({
-  startArchiver: vi.fn(),
+vi.mock('./board-manager.js', () => ({
+  startBoardManager: vi.fn(),
 }))
 
-import { startArchiver } from './archiver.js'
+import { startBoardManager } from './board-manager.js'
 
-const mockStartArchiver = vi.mocked(startArchiver)
+const mockStartBoardManager = vi.mocked(startBoardManager)
 
-function makeStopFn(): ArchiverResult['stop'] {
+function makeStopFn(): BoardManagerResult['stop'] {
   return vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
 }
 
 function makeTmpDir(): string {
-  return mkdtempSync(join(tmpdir(), 'archiver-manager-test-'))
+  return mkdtempSync(join(tmpdir(), 'board-managers-test-'))
 }
 
-describe('startArchiverManager', () => {
+describe('startBoardManagers', () => {
   const dirs: string[] = []
 
   function tmpDir(): string {
@@ -31,7 +31,7 @@ describe('startArchiverManager', () => {
   }
 
   beforeEach(() => {
-    mockStartArchiver.mockReset()
+    mockStartBoardManager.mockReset()
   })
 
   afterEach(async () => {
@@ -41,46 +41,46 @@ describe('startArchiverManager', () => {
     dirs.length = 0
   })
 
-  it('starts archivers for all boards in initial config', async () => {
+  it('starts board managers for all boards in initial config', async () => {
     const stopA = makeStopFn()
     const stopB = makeStopFn()
-    mockStartArchiver
+    mockStartBoardManager
       .mockResolvedValueOnce({ stop: stopA })
       .mockResolvedValueOnce({ stop: stopB })
 
     const dir = tmpDir()
     const configPath = join(dir, 'config.json')
-    const config: MultiArchiverConfig = {
+    const config: MultiBoardConfig = {
       boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
     }
     writeFileSync(configPath, JSON.stringify(config))
 
-    const manager = await startArchiverManager(configPath, config)
+    const manager = await startBoardManagers(configPath, config)
 
-    expect(manager.archivers.size).toBe(2)
-    expect(manager.archivers.has('a.eth')).toBe(true)
-    expect(manager.archivers.has('b.eth')).toBe(true)
+    expect(manager.boardManagers.size).toBe(2)
+    expect(manager.boardManagers.has('a.eth')).toBe(true)
+    expect(manager.boardManagers.has('b.eth')).toBe(true)
     expect(manager.errors.size).toBe(0)
 
     await manager.stop()
   })
 
   it('records failed boards in errors map and continues', async () => {
-    mockStartArchiver
+    mockStartBoardManager
       .mockRejectedValueOnce(new Error('connection refused'))
       .mockResolvedValueOnce({ stop: makeStopFn() })
 
     const dir = tmpDir()
     const configPath = join(dir, 'config.json')
-    const config: MultiArchiverConfig = {
+    const config: MultiBoardConfig = {
       boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
     }
     writeFileSync(configPath, JSON.stringify(config))
 
-    const manager = await startArchiverManager(configPath, config)
+    const manager = await startBoardManagers(configPath, config)
 
-    expect(manager.archivers.size).toBe(1)
-    expect(manager.archivers.has('b.eth')).toBe(true)
+    expect(manager.boardManagers.size).toBe(1)
+    expect(manager.boardManagers.has('b.eth')).toBe(true)
     expect(manager.errors.size).toBe(1)
     expect(manager.errors.get('a.eth')?.message).toBe('connection refused')
 
@@ -88,18 +88,18 @@ describe('startArchiverManager', () => {
   })
 
   it('throws AggregateError when all boards fail to start', async () => {
-    mockStartArchiver
+    mockStartBoardManager
       .mockRejectedValueOnce(new Error('connection refused'))
       .mockRejectedValueOnce(new Error('timeout'))
 
     const dir = tmpDir()
     const configPath = join(dir, 'config.json')
-    const config: MultiArchiverConfig = {
+    const config: MultiBoardConfig = {
       boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
     }
     writeFileSync(configPath, JSON.stringify(config))
 
-    await expect(startArchiverManager(configPath, config)).rejects.toThrow(
+    await expect(startBoardManagers(configPath, config)).rejects.toThrow(
       'All 2 board(s) failed to start',
     )
   })
@@ -107,23 +107,23 @@ describe('startArchiverManager', () => {
   it('starts with empty config', async () => {
     const dir = tmpDir()
     const configPath = join(dir, 'config.json')
-    const config: MultiArchiverConfig = { boards: [] }
+    const config: MultiBoardConfig = { boards: [] }
     writeFileSync(configPath, JSON.stringify(config))
 
-    const manager = await startArchiverManager(configPath, config)
+    const manager = await startBoardManagers(configPath, config)
 
-    expect(manager.archivers.size).toBe(0)
+    expect(manager.boardManagers.size).toBe(0)
     expect(manager.errors.size).toBe(0)
 
     await manager.stop()
   })
 
-  it('passes correct options to startArchiver', async () => {
-    mockStartArchiver.mockResolvedValue({ stop: makeStopFn() })
+  it('passes correct options to startBoardManager', async () => {
+    mockStartBoardManager.mockResolvedValue({ stop: makeStopFn() })
 
     const dir = tmpDir()
     const configPath = join(dir, 'config.json')
-    const config: MultiArchiverConfig = {
+    const config: MultiBoardConfig = {
       rpcUrl: 'ws://test:9138',
       stateDir: '/test/state',
       defaults: { perPage: 20 },
@@ -131,9 +131,9 @@ describe('startArchiverManager', () => {
     }
     writeFileSync(configPath, JSON.stringify(config))
 
-    const manager = await startArchiverManager(configPath, config)
+    const manager = await startBoardManagers(configPath, config)
 
-    const opts = mockStartArchiver.mock.calls[0][0] as ArchiverOptions
+    const opts = mockStartBoardManager.mock.calls[0][0] as BoardManagerOptions
     expect(opts.subplebbitAddress).toBe('x.eth')
     expect(opts.plebbitRpcUrl).toBe('ws://test:9138')
     expect(opts.stateDir).toBe('/test/state')
@@ -144,25 +144,25 @@ describe('startArchiverManager', () => {
   })
 
   describe('hot-reload', () => {
-    it('starts new archivers when boards are added to config', async () => {
+    it('starts new board managers when boards are added to config', async () => {
       const stopA = makeStopFn()
       const stopNew = makeStopFn()
-      mockStartArchiver
+      mockStartBoardManager
         .mockResolvedValueOnce({ stop: stopA })
         .mockResolvedValueOnce({ stop: stopNew })
 
       const dir = tmpDir()
       const configPath = join(dir, 'config.json')
-      const config: MultiArchiverConfig = {
+      const config: MultiBoardConfig = {
         boards: [{ address: 'a.eth' }],
       }
       writeFileSync(configPath, JSON.stringify(config))
 
-      const manager = await startArchiverManager(configPath, config)
-      expect(manager.archivers.size).toBe(1)
+      const manager = await startBoardManagers(configPath, config)
+      expect(manager.boardManagers.size).toBe(1)
 
       // Write updated config with new board
-      const newConfig: MultiArchiverConfig = {
+      const newConfig: MultiBoardConfig = {
         boards: [{ address: 'a.eth' }, { address: 'new.eth' }],
       }
       writeFileSync(configPath, JSON.stringify(newConfig))
@@ -170,31 +170,31 @@ describe('startArchiverManager', () => {
       // Wait for debounce + async handling
       await new Promise((r) => setTimeout(r, 500))
 
-      expect(manager.archivers.size).toBe(2)
-      expect(manager.archivers.has('new.eth')).toBe(true)
+      expect(manager.boardManagers.size).toBe(2)
+      expect(manager.boardManagers.has('new.eth')).toBe(true)
 
       await manager.stop()
     })
 
-    it('restarts archivers when board config changes', async () => {
+    it('restarts board managers when board config changes', async () => {
       const stopA = makeStopFn()
       const stopNew = makeStopFn()
-      mockStartArchiver
+      mockStartBoardManager
         .mockResolvedValueOnce({ stop: stopA })
         .mockResolvedValueOnce({ stop: stopNew })
 
       const dir = tmpDir()
       const configPath = join(dir, 'config.json')
-      const config: MultiArchiverConfig = {
+      const config: MultiBoardConfig = {
         boards: [{ address: 'a.eth', bumpLimit: 300 }],
       }
       writeFileSync(configPath, JSON.stringify(config))
 
-      const manager = await startArchiverManager(configPath, config)
-      expect(manager.archivers.size).toBe(1)
+      const manager = await startBoardManagers(configPath, config)
+      expect(manager.boardManagers.size).toBe(1)
 
       // Write updated config with changed bumpLimit
-      const newConfig: MultiArchiverConfig = {
+      const newConfig: MultiBoardConfig = {
         boards: [{ address: 'a.eth', bumpLimit: 500 }],
       }
       writeFileSync(configPath, JSON.stringify(newConfig))
@@ -203,31 +203,31 @@ describe('startArchiverManager', () => {
       await new Promise((r) => setTimeout(r, 500))
 
       expect(stopA).toHaveBeenCalledOnce()
-      expect(mockStartArchiver).toHaveBeenCalledTimes(2)
-      expect(manager.archivers.size).toBe(1)
-      expect(manager.archivers.has('a.eth')).toBe(true)
+      expect(mockStartBoardManager).toHaveBeenCalledTimes(2)
+      expect(manager.boardManagers.size).toBe(1)
+      expect(manager.boardManagers.has('a.eth')).toBe(true)
 
       await manager.stop()
     })
 
     it('records error when restart of changed board fails', async () => {
       const stopA = makeStopFn()
-      mockStartArchiver
+      mockStartBoardManager
         .mockResolvedValueOnce({ stop: stopA })
         .mockRejectedValueOnce(new Error('restart failed'))
 
       const dir = tmpDir()
       const configPath = join(dir, 'config.json')
-      const config: MultiArchiverConfig = {
+      const config: MultiBoardConfig = {
         boards: [{ address: 'a.eth', bumpLimit: 300 }],
       }
       writeFileSync(configPath, JSON.stringify(config))
 
-      const manager = await startArchiverManager(configPath, config)
-      expect(manager.archivers.size).toBe(1)
+      const manager = await startBoardManagers(configPath, config)
+      expect(manager.boardManagers.size).toBe(1)
 
       // Write updated config with changed bumpLimit
-      const newConfig: MultiArchiverConfig = {
+      const newConfig: MultiBoardConfig = {
         boards: [{ address: 'a.eth', bumpLimit: 500 }],
       }
       writeFileSync(configPath, JSON.stringify(newConfig))
@@ -236,32 +236,32 @@ describe('startArchiverManager', () => {
       await new Promise((r) => setTimeout(r, 500))
 
       expect(stopA).toHaveBeenCalledOnce()
-      expect(manager.archivers.has('a.eth')).toBe(false)
+      expect(manager.boardManagers.has('a.eth')).toBe(false)
       expect(manager.errors.size).toBe(1)
       expect(manager.errors.get('a.eth')?.message).toBe('restart failed')
 
       await manager.stop()
     })
 
-    it('stops archivers when boards are removed from config', async () => {
+    it('stops board managers when boards are removed from config', async () => {
       const stopA = makeStopFn()
       const stopB = makeStopFn()
-      mockStartArchiver
+      mockStartBoardManager
         .mockResolvedValueOnce({ stop: stopA })
         .mockResolvedValueOnce({ stop: stopB })
 
       const dir = tmpDir()
       const configPath = join(dir, 'config.json')
-      const config: MultiArchiverConfig = {
+      const config: MultiBoardConfig = {
         boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
       }
       writeFileSync(configPath, JSON.stringify(config))
 
-      const manager = await startArchiverManager(configPath, config)
-      expect(manager.archivers.size).toBe(2)
+      const manager = await startBoardManagers(configPath, config)
+      expect(manager.boardManagers.size).toBe(2)
 
       // Write updated config with removed board
-      const newConfig: MultiArchiverConfig = {
+      const newConfig: MultiBoardConfig = {
         boards: [{ address: 'a.eth' }],
       }
       writeFileSync(configPath, JSON.stringify(newConfig))
@@ -269,9 +269,9 @@ describe('startArchiverManager', () => {
       // Wait for debounce + async handling
       await new Promise((r) => setTimeout(r, 500))
 
-      expect(manager.archivers.size).toBe(1)
-      expect(manager.archivers.has('a.eth')).toBe(true)
-      expect(manager.archivers.has('b.eth')).toBe(false)
+      expect(manager.boardManagers.size).toBe(1)
+      expect(manager.boardManagers.has('a.eth')).toBe(true)
+      expect(manager.boardManagers.has('b.eth')).toBe(false)
       expect(stopB).toHaveBeenCalledOnce()
 
       await manager.stop()
@@ -279,21 +279,21 @@ describe('startArchiverManager', () => {
   })
 
   describe('stop()', () => {
-    it('calls stop on all archivers', async () => {
+    it('calls stop on all board managers', async () => {
       const stopA = makeStopFn()
       const stopB = makeStopFn()
-      mockStartArchiver
+      mockStartBoardManager
         .mockResolvedValueOnce({ stop: stopA })
         .mockResolvedValueOnce({ stop: stopB })
 
       const dir = tmpDir()
       const configPath = join(dir, 'config.json')
-      const config: MultiArchiverConfig = {
+      const config: MultiBoardConfig = {
         boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
       }
       writeFileSync(configPath, JSON.stringify(config))
 
-      const manager = await startArchiverManager(configPath, config)
+      const manager = await startBoardManagers(configPath, config)
       await manager.stop()
 
       expect(stopA).toHaveBeenCalledOnce()
@@ -303,18 +303,18 @@ describe('startArchiverManager', () => {
     it('is resilient to individual stop failures', async () => {
       const stopA = vi.fn<() => Promise<void>>().mockRejectedValue(new Error('cleanup fail'))
       const stopB = makeStopFn()
-      mockStartArchiver
+      mockStartBoardManager
         .mockResolvedValueOnce({ stop: stopA })
         .mockResolvedValueOnce({ stop: stopB })
 
       const dir = tmpDir()
       const configPath = join(dir, 'config.json')
-      const config: MultiArchiverConfig = {
+      const config: MultiBoardConfig = {
         boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
       }
       writeFileSync(configPath, JSON.stringify(config))
 
-      const manager = await startArchiverManager(configPath, config)
+      const manager = await startBoardManagers(configPath, config)
       // Should not throw even though stopA fails
       await manager.stop()
 

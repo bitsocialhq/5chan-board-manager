@@ -1,13 +1,13 @@
 import { readFileSync, writeFileSync, mkdirSync, renameSync, unlinkSync } from 'node:fs'
 import { dirname } from 'node:path'
-import type { BoardConfig, MultiArchiverConfig } from './types.js'
+import type { BoardConfig, MultiBoardConfig } from './types.js'
 
 /**
  * Load a config file from disk.
  * Returns a default config with empty boards on ENOENT.
  * Throws on invalid JSON or validation errors.
  */
-export function loadConfig(configPath: string): MultiArchiverConfig {
+export function loadConfig(configPath: string): MultiBoardConfig {
   let raw: string
   try {
     raw = readFileSync(configPath, 'utf-8')
@@ -72,7 +72,7 @@ export function loadConfig(configPath: string): MultiArchiverConfig {
     (config as Record<string, unknown>).boards = []
   }
 
-  return config as unknown as MultiArchiverConfig
+  return config as unknown as MultiBoardConfig
 }
 
 function validateNumericFields(obj: Record<string, unknown>, prefix: string, configPath: string): void {
@@ -90,7 +90,7 @@ function validateNumericFields(obj: Record<string, unknown>, prefix: string, con
  * Save a config to disk with pretty-printed JSON.
  * Creates parent directories if needed.
  */
-export function saveConfig(configPath: string, config: MultiArchiverConfig): void {
+export function saveConfig(configPath: string, config: MultiBoardConfig): void {
   mkdirSync(dirname(configPath), { recursive: true })
   const tmpPath = configPath + '.tmp'
   try {
@@ -105,7 +105,7 @@ export function saveConfig(configPath: string, config: MultiArchiverConfig): voi
 /**
  * Add a board to the config. Throws if the address already exists.
  */
-export function addBoard(config: MultiArchiverConfig, board: BoardConfig): MultiArchiverConfig {
+export function addBoard(config: MultiBoardConfig, board: BoardConfig): MultiBoardConfig {
   if (config.boards.some((b) => b.address === board.address)) {
     throw new Error(`Board "${board.address}" already exists in config`)
   }
@@ -118,7 +118,7 @@ export function addBoard(config: MultiArchiverConfig, board: BoardConfig): Multi
 /**
  * Remove a board from the config by address. Throws if not found.
  */
-export function removeBoard(config: MultiArchiverConfig, address: string): MultiArchiverConfig {
+export function removeBoard(config: MultiBoardConfig, address: string): MultiBoardConfig {
   const idx = config.boards.findIndex((b) => b.address === address)
   if (idx === -1) {
     throw new Error(`Board "${address}" not found in config`)
@@ -135,11 +135,11 @@ export function removeBoard(config: MultiArchiverConfig, address: string): Multi
  * Fields listed in `resetFields` are removed (reverts to defaults).
  */
 export function updateBoard(
-  config: MultiArchiverConfig,
+  config: MultiBoardConfig,
   address: string,
   updates: Partial<Omit<BoardConfig, 'address'>>,
   resetFields?: ReadonlyArray<keyof Omit<BoardConfig, 'address'>>,
-): MultiArchiverConfig {
+): MultiBoardConfig {
   const idx = config.boards.findIndex((b) => b.address === address)
   if (idx === -1) {
     throw new Error(`Board "${address}" not found in config`)
@@ -182,8 +182,8 @@ function boardConfigChanged(a: BoardConfig, b: BoardConfig): boolean {
  * Returns boards that were added, removed, or changed.
  */
 export function diffBoards(
-  oldConfig: MultiArchiverConfig,
-  newConfig: MultiArchiverConfig,
+  oldConfig: MultiBoardConfig,
+  newConfig: MultiBoardConfig,
 ): { added: BoardConfig[]; removed: string[]; changed: BoardConfig[] } {
   const oldAddresses = new Set(oldConfig.boards.map((b) => b.address))
   const newAddresses = new Set(newConfig.boards.map((b) => b.address))

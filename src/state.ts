@@ -1,21 +1,21 @@
 import { readFileSync, writeFileSync, mkdirSync, renameSync, unlinkSync, openSync, closeSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import envPaths from 'env-paths'
-import type { ArchiverState, FileLock } from './types.js'
+import type { BoardManagerState, FileLock } from './types.js'
 
-const DEFAULT_STATE: ArchiverState = {
+const DEFAULT_STATE: BoardManagerState = {
   signers: {},
   archivedThreads: {},
 }
 
 export function defaultStateDir(): string {
-  return join(envPaths('5chan-archiver').data, '5chan_archiver_states')
+  return join(envPaths('5chan-board-manager').data, '5chan_board_manager_states')
 }
 
-export function loadState(path: string): ArchiverState {
+export function loadState(path: string): BoardManagerState {
   try {
     const data = readFileSync(path, 'utf-8')
-    const parsed = JSON.parse(data) as Partial<ArchiverState>
+    const parsed = JSON.parse(data) as Partial<BoardManagerState>
     return {
       signers: parsed.signers ?? {},
       archivedThreads: parsed.archivedThreads ?? {},
@@ -25,7 +25,7 @@ export function loadState(path: string): ArchiverState {
   }
 }
 
-export function saveState(path: string, state: ArchiverState): void {
+export function saveState(path: string, state: BoardManagerState): void {
   mkdirSync(dirname(path), { recursive: true })
   const tmpPath = path + '.tmp'
   try {
@@ -59,7 +59,7 @@ export function acquireLock(statePath: string): FileLock {
     const pidStr = readFileSync(lockPath, 'utf-8').trim()
     const pid = Number(pidStr)
     if (isPidAlive(pid)) {
-      throw new Error(`Another archiver (PID ${pid}) is already running`)
+      throw new Error(`Another board manager (PID ${pid}) is already running`)
     }
     // Stale lock — remove and retry
     unlinkSync(lockPath)

@@ -1,19 +1,19 @@
 import Logger from '@plebbit/plebbit-logger'
-import { startArchiver } from './archiver.js'
-import { resolveArchiverOptions } from './multi-config.js'
-import type { ArchiverResult, MultiArchiverConfig, MultiArchiverResult } from './types.js'
+import { startBoardManager } from './board-manager.js'
+import { resolveBoardManagerOptions } from './multi-config.js'
+import type { BoardManagerResult, MultiBoardConfig, MultiBoardResult } from './types.js'
 
-const log = Logger('5chan-archiver:multi')
+const log = Logger('5chan:board-manager:multi')
 
 /**
- * Start archivers for all boards in the config.
+ * Start board managers for all boards in the config.
  *
  * Boards are started sequentially to avoid overwhelming the RPC server.
  * If a board fails to start, the error is recorded and remaining boards continue.
  * If ALL boards fail, throws an AggregateError.
  */
-export async function startMultiArchiver(config: MultiArchiverConfig): Promise<MultiArchiverResult> {
-  const archivers = new Map<string, ArchiverResult>()
+export async function startMultiBoardManager(config: MultiBoardConfig): Promise<MultiBoardResult> {
+  const boardManagers = new Map<string, BoardManagerResult>()
   const errors = new Map<string, Error>()
   let stopping = false
 
@@ -23,19 +23,19 @@ export async function startMultiArchiver(config: MultiArchiverConfig): Promise<M
       break
     }
 
-    const options = resolveArchiverOptions(board, config)
+    const options = resolveBoardManagerOptions(board, config)
     try {
-      log(`starting archiver for ${board.address}`)
-      const result = await startArchiver(options)
-      archivers.set(board.address, result)
+      log(`starting board manager for ${board.address}`)
+      const result = await startBoardManager(options)
+      boardManagers.set(board.address, result)
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err))
-      log.error(`failed to start archiver for ${board.address}: ${error.message}`)
+      log.error(`failed to start board manager for ${board.address}: ${error.message}`)
       errors.set(board.address, error)
     }
   }
 
-  if (archivers.size === 0 && errors.size > 0) {
+  if (boardManagers.size === 0 && errors.size > 0) {
     throw new AggregateError(
       [...errors.values()],
       `All ${errors.size} board(s) failed to start`,
@@ -43,23 +43,23 @@ export async function startMultiArchiver(config: MultiArchiverConfig): Promise<M
   }
 
   return {
-    archivers,
+    boardManagers,
     errors,
     async stop() {
       stopping = true
       const results = await Promise.allSettled(
-        [...archivers.entries()].map(async ([address, archiver]) => {
+        [...boardManagers.entries()].map(async ([address, manager]) => {
           try {
-            await archiver.stop()
+            await manager.stop()
           } catch (err) {
-            log.error(`error stopping archiver for ${address}: ${err}`)
+            log.error(`error stopping board manager for ${address}: ${err}`)
             throw err
           }
         }),
       )
       const failures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
       if (failures.length > 0) {
-        log.error(`${failures.length} archiver(s) failed to stop cleanly`)
+        log.error(`${failures.length} board manager(s) failed to stop cleanly`)
       }
     },
   }

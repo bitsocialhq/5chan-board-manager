@@ -2,6 +2,29 @@
 
 A CLI tool that implements 4chan-style thread auto-archiving and purging for Bitsocial communities.
 
+### Feature 1: Thread limit / auto-archive
+
+- After each board update, determine thread positions in active sort
+- Filter out pinned threads (they're exempt)
+- Count non-pinned threads; any beyond position `per_page × pages` → archive via `createCommentModeration({ commentModeration: { archived: true } })`
+- Archived threads are read-only (plebbit-js already enforces this)
+
+### Feature 2: Bump limit
+
+- Track reply counts for active threads
+- When a thread reaches `bump_limit` replies → archive it via `createCommentModeration({ commentModeration: { archived: true } })`
+
+### Feature 3: Delayed purge
+
+- Track when threads were archived
+- After `archive_purge_seconds` has elapsed since archiving → purge via `createCommentModeration({ commentModeration: { purged: true } })`
+
+### Feature 4: Author-deleted comment purging
+
+- On each update, scan comments and replies for `deleted === true`
+- Purge via `createCommentModeration({ commentModeration: { purged: true } })`
+- Duplicate purge moderations (if the board hasn't processed prior purge yet) are harmless no-ops
+
 ### Config File Format
 
 The config file (`~/.config/5chan/config.json`) is managed via `5chan board add/edit/remove` or manual editing:
@@ -122,7 +145,7 @@ USAGE
     [--archive-purge-seconds <value>]
 
 ARGUMENTS
-  ADDRESS  Subplebbit address to add
+  ADDRESS  Board address to add
 
 FLAGS
   --archive-purge-seconds=<value>  Seconds after archiving before purge
@@ -173,7 +196,7 @@ USAGE
   $ 5chan board remove ADDRESS
 
 ARGUMENTS
-  ADDRESS  Subplebbit address to remove
+  ADDRESS  Board address to remove
 
 DESCRIPTION
   Remove a board from the archiver config
@@ -253,27 +276,27 @@ The lock is released when the archiver stops.
 
 ## Author-Deleted Comment Purging
 
-The archiver detects comments and replies that were deleted by their author (where `comment.deleted === true`) and purges them via `createCommentModeration({ commentModeration: { purged: true } })`. Once purged, the comment is removed from the subplebbit and won't appear in future listings. If a purge hasn't been processed yet, the next cycle may re-publish a redundant purge moderation, which is a harmless no-op.
+The archiver detects comments and replies that were deleted by their author (where `comment.deleted === true`) and purges them via `createCommentModeration({ commentModeration: { purged: true } })`. Once purged, the comment is removed from the board and won't appear in future listings. If a purge hasn't been processed yet, the next cycle may re-publish a redundant purge moderation, which is a harmless no-op.
 
 ## Auto Mod Signer Management
 
-On startup for each subplebbit (using the internally-created Plebbit instance):
+On startup for each board (using the internally-created Plebbit instance):
 
-1. Check state JSON for a signer private key for this subplebbit address
+1. Check state JSON for a signer private key for this board address
 2. If none exists, create one via `plebbit.createSigner()` and save to state JSON
-3. Check `subplebbit.roles` for the signer's address
-4. If not a mod, auto-add via `subplebbit.edit()` (works because we run on LocalSubplebbit or RpcLocalSubplebbit — we own the sub)
+3. Check board roles via `subplebbit.roles` for the signer's address
+4. If not a mod, auto-add via `subplebbit.edit()` (works because we run on `LocalSubplebbit` or `RpcLocalSubplebbit` — we own the board)
 
 Logged via `plebbit-logger` when creating signer or adding mod role.
 
 ## State Persistence
 
-State is stored as one JSON file per subplebbit in the state directory (via `env-paths`: `~/.local/share/5chan-archiver/5chan_archiver_states/{address}.json`) or a custom directory via `stateDir` in the config.
+State is stored as one JSON file per board in the state directory (via `env-paths`: `~/.local/share/5chan-archiver/5chan_archiver_states/{address}.json`) or a custom directory via `stateDir` in the config.
 
 ```json
 {
   "signers": {
-    "<subplebbitAddress>": { "privateKey": "..." }
+    "<boardAddress>": { "privateKey": "..." }
   },
   "archivedThreads": {
     "<commentCid>": { "archivedTimestamp": 1234567890 }
@@ -281,7 +304,7 @@ State is stored as one JSON file per subplebbit in the state directory (via `env
 }
 ```
 
-- **`signers`**: maps subplebbit address → mod signer private key (auto-created if missing)
+- **`signers`**: maps board address → mod signer private key (auto-created if missing)
 - **`archivedThreads`**: maps comment CID → archive metadata (entries removed on purge)
 - State writes use atomic temp-then-rename to prevent corruption
 - Loaded on startup, written on archive, entries removed on purge
@@ -371,8 +394,8 @@ External module using plebbit-js's public API:
 
 - No plebbit-js core modifications needed
 - Uses `plebbit.createCommentModeration()` for both archiving and purging
-- Listens to subplebbit `update` events to detect new posts
-- Gets thread positions from `subplebbit.posts.pageCids.active`, or falls back to sorting preloaded pages by `lastReplyTimestamp` descending (then `postNumber`)
+- Listens to board `update` events (via `subplebbit.on('update', ...)`) to detect new posts
+- Gets thread positions from board post feeds (`subplebbit.posts.pageCids.active`), or falls back to sorting preloaded pages by `lastReplyTimestamp` descending (then `postNumber`)
 
 ### Configurable settings
 
@@ -394,9 +417,9 @@ Cannot do `subplebbit.posts.getPage("active")`. Must either:
 1. Use `subplebbit.posts.pageCids.active` to get the CID, then fetch that page
 2. Or fall back to sorting preloaded pages by `lastReplyTimestamp` descending, then `postNumber` (approximates active sort without needing `pageCids.active`)
 
-### Subplebbit record size constraint
+### Board record size constraint
 
-The entire subplebbit IPFS record is capped at 1MB (`MAX_FILE_SIZE_BYTES_FOR_SUBPLEBBIT_IPFS`). `subplebbit.posts.pages.hot` is preloaded into the record with whatever space remains after the rest of the record (title, description, roles, challenges, etc.).
+The entire board IPFS record is capped at 1MB (`MAX_FILE_SIZE_BYTES_FOR_SUBPLEBBIT_IPFS`). `subplebbit.posts.pages.hot` is preloaded into the record with whatever space remains after the rest of the record (title, description, roles, challenges, etc.).
 
 - If the preloaded page has **no `nextCid`**, it contains all posts — no pagination needed
 - If `nextCid` **is present**, additional pages must be fetched via `subplebbit.posts.getPage({ cid: nextCid })`
@@ -404,38 +427,15 @@ The entire subplebbit IPFS record is capped at 1MB (`MAX_FILE_SIZE_BYTES_FOR_SUB
 
 Reference: `plebbit-js/src/subplebbit/subplebbit-client-manager.ts:38`, `plebbit-js/src/runtime/node/subplebbit/local-subplebbit.ts:714`
 
-### Feature 1: Thread limit / auto-archive
-
-- After each subplebbit update, determine thread positions in active sort
-- Filter out pinned threads (they're exempt)
-- Count non-pinned threads; any beyond position `per_page × pages` → archive via `createCommentModeration({ commentModeration: { archived: true } })`
-- Archived threads are read-only (plebbit-js already enforces this)
-
-### Feature 2: Bump limit
-
-- Track reply counts for active threads
-- When a thread reaches `bump_limit` replies → archive it via `createCommentModeration({ commentModeration: { archived: true } })`
-
-### Feature 3: Delayed purge
-
-- Track when threads were archived
-- After `archive_purge_seconds` has elapsed since archiving → purge via `createCommentModeration({ commentModeration: { purged: true } })`
-
-### Feature 4: Author-deleted comment purging
-
-- On each update, scan comments and replies for `deleted === true`
-- Purge via `createCommentModeration({ commentModeration: { purged: true } })`
-- Duplicate purge moderations (if subplebbit hasn't processed prior purge yet) are harmless no-ops
-
 ### Module flow
 
 ```
 1. Create Plebbit instance internally from the provided plebbitRpcUrl
-2. Load state JSON; get or create signer for this subplebbit via plebbit.createSigner()
-3. Get subplebbit (LocalSubplebbit or RpcLocalSubplebbit)
-4. Check subplebbit.roles for signer address; if missing, subplebbit.edit() to add as mod
+2. Load state JSON; get or create signer for this board via `plebbit.createSigner()`
+3. Get board (`LocalSubplebbit` or `RpcLocalSubplebbit`)
+4. Check board roles via `subplebbit.roles`; if missing, call `subplebbit.edit()` to add as mod
 5. Acquire file lock to prevent concurrent archivers on same board
-6. Call subplebbit.update()
+6. Call `subplebbit.update()`
 7. On each 'update' event:
    a. Determine thread source (three scenarios):
       1. pageCids.active exists → fetch via getPage(), paginate via nextCid

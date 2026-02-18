@@ -1,0 +1,25 @@
+# 5chan archiver only — use when bitsocial-cli is already running elsewhere
+#
+# Quick start:
+#   cp docker-compose.standalone.example.yml docker-compose.yml
+#   # Edit PLEBBIT_RPC_WS_URL to point at your running bitsocial-cli instance
+#   # Create /data/config.json with your boards (see README.md)
+#   docker compose up -d
+#
+# View logs:
+#   docker compose logs -f 5chan
+
+services:
+  5chan:
+    image: ghcr.io/plebbit/5chan-board-cli:latest
+    container_name: 5chan
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - 5chan-data:/data
+    environment:
+      - PLEBBIT_RPC_WS_URL=ws://host.docker.internal:9138
+
+volumes:
+  5chan-data:

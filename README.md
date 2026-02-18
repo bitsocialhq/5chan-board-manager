@@ -82,27 +82,35 @@ ghcr.io/plebbit/5chan-board-cli:latest
 
 ### Docker Compose (recommended)
 
-Run 5chan alongside [bitsocial-cli](https://github.com/bitsocialhq/bitsocial-cli), which provides the Plebbit RPC server:
+#### Full stack (with bitsocial-cli)
+
+If you **don't** already have [bitsocial-cli](https://github.com/bitsocialhq/bitsocial-cli) running, use the full stack compose file which boots both bitsocial-cli (Plebbit RPC server) and 5chan together.:
 
 ```bash
 cp docker-compose.example.yml docker-compose.yml
-# Create /path/to/config.json with your boards (see Config File Format above)
+# Create /data/config.json with your boards (see Config File Format above)
 docker compose up -d
 ```
 
-See [`docker-compose.example.yml`](docker-compose.example.yml) for the full stack configuration.
+See [`docker-compose.example.yml`](docker-compose.example.yml) for the full configuration.
 
-### Docker Run
+#### Standalone (bitsocial-cli already running)
 
-If you already have a Plebbit RPC server running on the host:
+If you **already** have bitsocial-cli running separately (on the host, in another compose stack, etc.), use the standalone compose file which only runs 5chan:
 
 ```bash
-docker run -d \
-  --name 5chan \
-  -v /path/to/data:/data \
-  -e PLEBBIT_RPC_WS_URL=ws://host.docker.internal:9138 \
-  ghcr.io/plebbit/5chan-board-cli:latest
+cp docker-compose.standalone.example.yml docker-compose.yml
+# Edit PLEBBIT_RPC_WS_URL in docker-compose.yml to point at your running bitsocial-cli
+# Create /data/config.json with your boards (see Config File Format above)
+docker compose up -d
 ```
+
+Set `PLEBBIT_RPC_WS_URL` to the address of your existing instance:
+
+- **bitsocial-cli on the host (no container):** Use `ws://host.docker.internal:9138`. The example compose file includes `extra_hosts: ["host.docker.internal:host-gateway"]` so this works on Linux, macOS, and Windows.
+- **bitsocial-cli in another Docker container/network:** Use the container or service name, e.g. `ws://bitsocial:9138`, and make sure both containers share the same Docker network.
+
+See [`docker-compose.standalone.example.yml`](docker-compose.standalone.example.yml) for the configuration.
 
 ### Build locally
 

@@ -112,6 +112,23 @@ Set `PLEBBIT_RPC_WS_URL` to the address of your existing instance:
 
 See [`docker-compose.standalone.example.yml`](docker-compose.standalone.example.yml) for the configuration.
 
+### Running commands inside Docker
+
+Use `docker compose exec` to run `5chan` CLI commands inside the running container:
+
+```bash
+# Add a board
+docker compose exec 5chan 5chan board add random.eth
+
+# List configured boards
+docker compose exec 5chan 5chan board list
+
+# Remove a board
+docker compose exec 5chan 5chan board remove random.eth
+```
+
+The container auto-reloads when `/data/config.json` changes, so boards added via `5chan board add` take effect immediately without restarting.
+
 ### Build locally
 
 ```bash

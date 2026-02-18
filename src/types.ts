@@ -50,3 +50,35 @@ export interface ArchiverState {
   archivedThreads: Record<string, ArchivedThread>
   purgedDeletedComments: Record<string, true>
 }
+
+/** Per-board config entry in the multi-archiver config file */
+export interface BoardConfig {
+  address: string
+  perPage?: number
+  pages?: number
+  bumpLimit?: number
+  archivePurgeSeconds?: number
+}
+
+/** Default settings applied to all boards unless overridden per-board */
+export interface BoardDefaults {
+  perPage?: number
+  pages?: number
+  bumpLimit?: number
+  archivePurgeSeconds?: number
+}
+
+/** Top-level multi-archiver JSON config */
+export interface MultiArchiverConfig {
+  rpcUrl?: string
+  stateDir?: string
+  defaults?: BoardDefaults
+  boards: BoardConfig[]
+}
+
+/** Result of starting the multi-archiver */
+export interface MultiArchiverResult {
+  archivers: Map<string, ArchiverResult>
+  errors: Map<string, Error>
+  stop: () => Promise<void>
+}

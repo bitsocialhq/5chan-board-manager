@@ -1,5 +1,5 @@
 {
-  "name": "5chan-board-archiver",
+  "name": "5chan-board-cli",
   "version": "0.1.0",
   "description": "4chan-style thread auto-archiving and purging for plebbit-js subplebbits",
   "license": "GPL-3.0-only",
@@ -22,7 +22,8 @@
     }
   },
   "bin": {
-    "5chan-archiver": "dist/cli.js"
+    "5chan-archiver": "dist/cli.js",
+    "5chan-archiver-multi": "dist/cli-multi.js"
   },
   "engines": {
     "node": ">=22.0.0"
@@ -32,7 +33,8 @@
     "prepare": "npm run build",
     "test": "vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "start": "node --env-file=.env dist/cli.js"
+    "start": "node --env-file=.env dist/cli.js",
+    "start:multi": "node --env-file=.env dist/cli-multi.js"
   },
   "dependencies": {
     "@plebbit/plebbit-js": "git+https://github.com/plebbit/plebbit-js.git#a92fb7e82b4a534c160fc74dc1902d63e24e3142",

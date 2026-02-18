@@ -1,17 +1,18 @@
-# Plebbit Auto-Archiving Module
+# 5chan Board CLI
 
 An ESM TypeScript npm package that implements 4chan-style thread auto-archiving and purging for plebbit-js subplebbits. Uses plebbit-js's public API (`plebbit.createCommentModeration()`) — **no plebbit-js modifications required**.
 
 > **Node.js only.** This is a Node.js-only ESM package — it requires a Plebbit RPC server connection and uses Node.js APIs (`fs`, `node:util`). Apps using it as a library (like 5chan) must run the archiver in a Node.js environment, not in the browser.
 
-Works two ways:
+Works three ways:
 1. **Library** — imported by 5chan (web UI) as a dependency
-2. **CLI** — `node dist/cli.js <subplebbit-address> [--flags]`
+2. **Single-board CLI** — `5chan-archiver <subplebbit-address> [--flags]`
+3. **Multi-board CLI** — `5chan-archiver-multi <config.json>`
 
 ## Library API
 
 ```ts
-import { startArchiver } from '5chan-board-archiver'
+import { startArchiver } from '5chan-board-cli'
 
 const archiver = await startArchiver({
   subplebbitAddress: 'my-board.eth',
@@ -44,6 +45,91 @@ Or via npm script:
 
 ```bash
 npm start -- <subplebbit-address> [--flags]
+```
+
+## Multi-Board Usage
+
+Run archivers for multiple boards in a single process using a JSON config file:
+
+```bash
+5chan-archiver-multi archiver-config.json
+# or
+5chan-archiver-multi --config archiver-config.json
+```
+
+### Config File Format
+
+```json
+{
+  "rpcUrl": "ws://localhost:9138",
+  "stateDir": "/data/5chan-archiver",
+  "defaults": {
+    "perPage": 15,
+    "pages": 10,
+    "bumpLimit": 300,
+    "archivePurgeSeconds": 172800
+  },
+  "boards": [
+    { "address": "random.eth" },
+    { "address": "tech.eth", "bumpLimit": 500 },
+    { "address": "flash.eth", "perPage": 30, "pages": 1 }
+  ]
+}
+```
+
+**Minimal config:** `{ "boards": [{ "address": "my-board.eth" }] }`
+
+All fields except `boards[].address` are optional:
+- `rpcUrl` — falls back to `PLEBBIT_RPC_WS_URL` env var, then `ws://localhost:9138`
+- `stateDir` — falls back to OS data directory
+- `defaults` — applied to all boards unless overridden per-board
+- Per-board fields (`perPage`, `pages`, `bumpLimit`, `archivePurgeSeconds`) override `defaults`
+
+### Multi-Board Library API
+
+```ts
+import { loadMultiConfig, startMultiArchiver } from '5chan-board-cli'
+
+const config = loadMultiConfig('archiver-config.json')
+const result = await startMultiArchiver(config)
+
+console.log(`Started: ${result.archivers.size}, Failed: ${result.errors.size}`)
+
+// Graceful shutdown
+await result.stop()
+```
+
+### Docker Example
+
+```dockerfile
+FROM node:22-slim
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+COPY dist/ dist/
+VOLUME /data
+CMD ["node", "dist/cli-multi.js", "/data/archiver-config.json"]
+```
+
+```bash
+docker run -v /host/data:/data my-archiver
+```
+
+### systemd Service Example
+
+```ini
+[Unit]
+Description=5chan Board Archiver
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node /opt/5chan-archiver/dist/cli-multi.js /etc/5chan-archiver/config.json
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
 ```
 
 ## .env Configuration

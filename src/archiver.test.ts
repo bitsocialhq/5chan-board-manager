@@ -92,7 +92,7 @@ describe('archiver logic', () => {
   describe('state-based thread tracking', () => {
     it('records archivedTimestamp when adding an archived thread', () => {
       const filePath = join(stateDir, 'test.json')
-      const state: ArchiverState = { signers: {}, archivedThreads: {}, purgedDeletedComments: {} }
+      const state: ArchiverState = { signers: {}, archivedThreads: {} }
       const now = Math.floor(Date.now() / 1000)
       state.archivedThreads['QmTest'] = { archivedTimestamp: now }
       saveState(filePath, state)
@@ -109,7 +109,6 @@ describe('archiver logic', () => {
           'QmKeep': { archivedTimestamp: 1000 },
           'QmPurge': { archivedTimestamp: 500 },
         },
-        purgedDeletedComments: {},
       }
       delete state.archivedThreads['QmPurge']
       saveState(filePath, state)
@@ -231,7 +230,6 @@ describe('archiver logic', () => {
           'QmRecent': { archivedTimestamp: now - 1000 }, // < 48h ago
           'QmExact': { archivedTimestamp: now - 172800 }, // exactly 48h ago
         },
-        purgedDeletedComments: {},
       }
 
       const toPurge = Object.entries(state.archivedThreads)
@@ -249,7 +247,6 @@ describe('archiver logic', () => {
           'Qm1': { archivedTimestamp: now - 100 },
           'Qm2': { archivedTimestamp: now },
         },
-        purgedDeletedComments: {},
       }
 
       const toPurge = Object.entries(state.archivedThreads)
@@ -261,7 +258,7 @@ describe('archiver logic', () => {
   describe('signer management', () => {
     it('persists signer to state file', () => {
       const filePath = join(stateDir, 'test.json')
-      const state: ArchiverState = { signers: {}, archivedThreads: {}, purgedDeletedComments: {} }
+      const state: ArchiverState = { signers: {}, archivedThreads: {} }
       state.signers['my-board.eth'] = { privateKey: 'test-private-key' }
       saveState(filePath, state)
 
@@ -274,7 +271,6 @@ describe('archiver logic', () => {
       const state: ArchiverState = {
         signers: { 'board.eth': { privateKey: 'existing-key' } },
         archivedThreads: {},
-        purgedDeletedComments: {},
       }
       saveState(filePath, state)
 
@@ -291,7 +287,6 @@ describe('archiver logic', () => {
           'board2.eth': { privateKey: 'key2' },
         },
         archivedThreads: {},
-        purgedDeletedComments: {},
       }
       saveState(filePath, state)
 
@@ -307,7 +302,6 @@ describe('archiver logic', () => {
       const state: ArchiverState = {
         signers: {},
         archivedThreads: { 'QmAlready': { archivedTimestamp: 1000 } },
-        purgedDeletedComments: {},
       }
       const threads = [mockThread('QmAlready'), mockThread('QmNew')]
       const maxThreads = 0 // all beyond capacity
@@ -941,47 +935,6 @@ describe('archiver logic', () => {
       await archiver.stop()
     })
 
-    it('skips already-purged deleted comments (idempotency)', async () => {
-      const { instance, publishedModerations } = createMockPlebbit()
-      const threads = [
-        mockThread('QmDeleted', { deleted: true }),
-      ]
-      const getPage = vi.fn().mockResolvedValue({
-        comments: threads,
-        nextCid: undefined,
-      } as Page)
-
-      const mockSub = createMockSubplebbit({
-        pageCids: { active: 'QmPage1' },
-        pages: {},
-        getPage,
-      })
-      vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
-
-      // Pre-seed state with already-purged comment
-      const statePath = join(stateDir, 'board.eth.json')
-      saveState(statePath, {
-        signers: {},
-        archivedThreads: {},
-        purgedDeletedComments: { 'QmDeleted': true },
-      })
-
-      const archiver = await startArchiver({
-        subplebbitAddress: 'board.eth',
-        plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
-        perPage: 15,
-        pages: 10,
-      })
-
-      // Wait for update to process
-      await new Promise((r) => setTimeout(r, 100))
-
-      const purges = publishedModerations.filter((m) => m.commentModeration.purged === true)
-      expect(purges).toHaveLength(0)
-      await archiver.stop()
-    })
-
     it('cleans up archivedThreads when deleted thread is purged', async () => {
       const { instance, publishedModerations } = createMockPlebbit()
       const threads = [
@@ -1004,7 +957,6 @@ describe('archiver logic', () => {
       saveState(statePath, {
         signers: {},
         archivedThreads: { 'QmArchived': { archivedTimestamp: Math.floor(Date.now() / 1000) } },
-        purgedDeletedComments: {},
       })
 
       const archiver = await startArchiver({
@@ -1022,7 +974,6 @@ describe('archiver logic', () => {
 
       const loaded = loadState(statePath)
       expect(loaded.archivedThreads['QmArchived']).toBeUndefined()
-      expect(loaded.purgedDeletedComments['QmArchived']).toBe(true)
       await archiver.stop()
     })
 
@@ -1062,31 +1013,6 @@ describe('archiver logic', () => {
       await archiver.stop()
     })
 
-    it('purgedDeletedComments survives save/load cycle', () => {
-      const filePath = join(stateDir, 'test.json')
-      const state: ArchiverState = {
-        signers: {},
-        archivedThreads: {},
-        purgedDeletedComments: { 'QmDel1': true, 'QmDel2': true },
-      }
-      saveState(filePath, state)
-
-      const loaded = loadState(filePath)
-      expect(loaded.purgedDeletedComments['QmDel1']).toBe(true)
-      expect(loaded.purgedDeletedComments['QmDel2']).toBe(true)
-    })
-
-    it('old state files without purgedDeletedComments load with empty object', () => {
-      const filePath = join(stateDir, 'test.json')
-      // Simulate old state file format without purgedDeletedComments
-      mkdirSync(stateDir, { recursive: true })
-      writeFileSync(filePath, JSON.stringify({ signers: {}, archivedThreads: {} }))
-
-      const loaded = loadState(filePath)
-      expect(loaded.purgedDeletedComments).toEqual({})
-      expect(loaded.signers).toEqual({})
-      expect(loaded.archivedThreads).toEqual({})
-    })
   })
 
   describe('per-subplebbit state isolation', () => {

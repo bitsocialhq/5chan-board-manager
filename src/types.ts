@@ -48,7 +48,6 @@ export interface FileLock {
 export interface ArchiverState {
   signers: Record<string, SignerState>
   archivedThreads: Record<string, ArchivedThread>
-  purgedDeletedComments: Record<string, true>
 }
 
 /** Per-board config entry in the multi-archiver config file */

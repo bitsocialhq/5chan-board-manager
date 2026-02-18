@@ -21,14 +21,13 @@ describe('state', () => {
   describe('loadState', () => {
     it('returns default state when file does not exist', () => {
       const state = loadState(statePath)
-      expect(state).toEqual({ signers: {}, archivedThreads: {}, purgedDeletedComments: {} })
+      expect(state).toEqual({ signers: {}, archivedThreads: {} })
     })
 
     it('loads existing state from file', () => {
       const existing: ArchiverState = {
         signers: { 'sub1.eth': { privateKey: 'pk123' } },
         archivedThreads: { 'Qm123': { archivedTimestamp: 1000 } },
-        purgedDeletedComments: {},
       }
       saveState(statePath, existing)
       const loaded = loadState(statePath)
@@ -39,7 +38,7 @@ describe('state', () => {
       const { writeFileSync } = await import('node:fs')
       writeFileSync(statePath, 'not json')
       const state = loadState(statePath)
-      expect(state).toEqual({ signers: {}, archivedThreads: {}, purgedDeletedComments: {} })
+      expect(state).toEqual({ signers: {}, archivedThreads: {} })
     })
   })
 
@@ -48,7 +47,6 @@ describe('state', () => {
       const state: ArchiverState = {
         signers: { 'board.eth': { privateKey: 'abc' } },
         archivedThreads: {},
-        purgedDeletedComments: {},
       }
       saveState(statePath, state)
       const raw = readFileSync(statePath, 'utf-8')
@@ -59,14 +57,12 @@ describe('state', () => {
       const state1: ArchiverState = {
         signers: {},
         archivedThreads: { 'Qm1': { archivedTimestamp: 100 } },
-        purgedDeletedComments: {},
       }
       saveState(statePath, state1)
 
       const state2: ArchiverState = {
         signers: {},
         archivedThreads: { 'Qm2': { archivedTimestamp: 200 } },
-        purgedDeletedComments: {},
       }
       saveState(statePath, state2)
 
@@ -85,7 +81,6 @@ describe('state', () => {
           'QmA': { archivedTimestamp: 1000 },
           'QmB': { archivedTimestamp: 2000 },
         },
-        purgedDeletedComments: {},
       }
       saveState(statePath, state)
       const loaded = loadState(statePath)
@@ -95,7 +90,7 @@ describe('state', () => {
 
     it('auto-creates missing parent directories', () => {
       const nestedPath = join(dir, 'a', 'b', 'c', 'state.json')
-      const state: ArchiverState = { signers: {}, archivedThreads: {}, purgedDeletedComments: {} }
+      const state: ArchiverState = { signers: {}, archivedThreads: {} }
       saveState(nestedPath, state)
 
       expect(existsSync(nestedPath)).toBe(true)
@@ -106,7 +101,7 @@ describe('state', () => {
 
   describe('saveState atomic write', () => {
     it('does not leave a .tmp file after successful write', () => {
-      const state: ArchiverState = { signers: {}, archivedThreads: {}, purgedDeletedComments: {} }
+      const state: ArchiverState = { signers: {}, archivedThreads: {} }
       saveState(statePath, state)
       expect(existsSync(statePath + '.tmp')).toBe(false)
       expect(existsSync(statePath)).toBe(true)
@@ -116,7 +111,6 @@ describe('state', () => {
       const state: ArchiverState = {
         signers: { 'x.eth': { privateKey: 'original' } },
         archivedThreads: {},
-        purgedDeletedComments: {},
       }
       saveState(statePath, state)
 
@@ -130,7 +124,7 @@ describe('state', () => {
     it('overwrites leftover .tmp on next successful save', () => {
       writeFileSync(statePath + '.tmp', 'garbage')
 
-      const state: ArchiverState = { signers: {}, archivedThreads: {}, purgedDeletedComments: {} }
+      const state: ArchiverState = { signers: {}, archivedThreads: {} }
       saveState(statePath, state)
 
       expect(existsSync(statePath + '.tmp')).toBe(false)

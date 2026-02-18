@@ -6,7 +6,6 @@ import type { ArchiverState, FileLock } from './types.js'
 const DEFAULT_STATE: ArchiverState = {
   signers: {},
   archivedThreads: {},
-  purgedDeletedComments: {},
 }
 
 export function defaultStateDir(): string {
@@ -20,7 +19,6 @@ export function loadState(path: string): ArchiverState {
     return {
       signers: parsed.signers ?? {},
       archivedThreads: parsed.archivedThreads ?? {},
-      purgedDeletedComments: parsed.purgedDeletedComments ?? {},
     }
   } catch {
     return structuredClone(DEFAULT_STATE)

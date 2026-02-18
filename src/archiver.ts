@@ -110,7 +110,6 @@ export async function startArchiver(options: ArchiverOptions): Promise<ArchiverR
     if (state.archivedThreads[commentCid]) {
       delete state.archivedThreads[commentCid]
     }
-    state.purgedDeletedComments[commentCid] = true
     saveState(statePath, state)
   }
 
@@ -139,7 +138,7 @@ export async function startArchiver(options: ArchiverOptions): Promise<ArchiverR
 
     function processComments(comments: ThreadComment[]): void {
       for (const comment of comments) {
-        if (comment.deleted && !state.purgedDeletedComments[comment.cid]) {
+        if (comment.deleted) {
           deletedCids.push(comment.cid)
         }
         if (comment.replies?.pages) {
@@ -265,7 +264,7 @@ export async function startArchiver(options: ArchiverOptions): Promise<ArchiverR
 
     // Purge author-deleted threads and replies
     for (const thread of threads) {
-      if (thread.deleted && !state.purgedDeletedComments[thread.cid]) {
+      if (thread.deleted) {
         try {
           await purgeDeletedComment(thread.cid, signer)
         } catch (err) {

@@ -10,6 +10,7 @@
   "type": "module",
   "files": [
     "dist",
+    "bin",
     "LICENSE",
     "README.md"
   ],
@@ -22,8 +23,16 @@
     }
   },
   "bin": {
-    "5chan-archiver": "dist/cli.js",
-    "5chan-archiver-multi": "dist/cli-multi.js"
+    "5chan": "./bin/run.js"
+  },
+  "oclif": {
+    "bin": "5chan",
+    "dirname": "5chan",
+    "commands": "./dist/commands",
+    "topicSeparator": " ",
+    "plugins": [
+      "@oclif/plugin-help"
+    ]
   },
   "engines": {
     "node": ">=22.0.0"
@@ -32,11 +41,11 @@
     "build": "tsc",
     "prepare": "npm run build",
     "test": "vitest run",
-    "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "start": "node --env-file=.env dist/cli.js",
-    "start:multi": "node --env-file=.env dist/cli-multi.js"
+    "test:e2e": "vitest run --config vitest.e2e.config.ts"
   },
   "dependencies": {
+    "@oclif/core": "^4.8.0",
+    "@oclif/plugin-help": "^6.2.37",
     "@plebbit/plebbit-js": "git+https://github.com/plebbit/plebbit-js.git#a92fb7e82b4a534c160fc74dc1902d63e24e3142",
     "env-paths": "4.0.0"
   },

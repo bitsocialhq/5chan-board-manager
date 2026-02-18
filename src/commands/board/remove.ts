@@ -12,6 +12,10 @@ export default class BoardRemove extends Command {
 
   static override description = 'Remove a board from the archiver config'
 
+  static override examples = [
+    '5chan board remove random.eth',
+  ]
+
   async run(): Promise<void> {
     const { args } = await this.parse(BoardRemove)
     const configPath = join(this.config.configDir, 'config.json')

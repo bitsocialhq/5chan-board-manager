@@ -24,13 +24,19 @@
     "topicSeparator": " ",
     "plugins": [
       "@oclif/plugin-help"
-    ]
+    ],
+    "topics": {
+      "board": {
+        "description": "Manage boards in the archiver config"
+      }
+    }
   },
   "engines": {
     "node": ">=22.0.0"
   },
   "scripts": {
     "build": "tsc",
+    "generate:readme": "npx oclif readme",
     "commit": "cz",
     "prepare": "husky && npm run build",
     "release": "HUSKY=0 release-it --config config/.release-it.json",
@@ -52,6 +58,7 @@
     "husky": "9.1.7",
     "release-it": "19.2.4",
     "typescript": "5.9.3",
+    "oclif": "4.22.59",
     "vitest": "4.0.18"
   },
   "config": {

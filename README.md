@@ -2,40 +2,6 @@
 
 A CLI tool that implements 4chan-style thread auto-archiving and purging for Bitsocial communities.
 
-## Usage
-
-The `5chan` binary provides subcommands for managing boards and running archivers.
-
-### Starting the archiver
-
-```bash
-5chan start [--config PATH]
-```
-
-- Reads the config file at `~/.config/5chan/config.json` by default, or from `--config PATH`
-- Starts one archiver per configured board
-- Watches the config file for changes and auto-starts/stops archivers (hot-reload)
-- Handles `SIGINT`/`SIGTERM` for graceful shutdown
-
-### Managing boards
-
-Add, list, and remove boards from the config file:
-
-```bash
-# Add a board (validates it exists on the RPC node)
-5chan board add <address> [--rpc-url URL] [--per-page N] [--pages N] [--bump-limit N] [--archive-purge-seconds N]
-
-# List configured boards
-5chan board list
-
-# Remove a board
-5chan board remove <address>
-```
-
-- `board add` validates the address against the Plebbit RPC node before adding
-- `--rpc-url` defaults to `PLEBBIT_RPC_WS_URL` env var, then `ws://localhost:9138`
-- Per-board settings (`--per-page`, `--pages`, `--bump-limit`, `--archive-purge-seconds`) are optional overrides
-
 ### Config File Format
 
 The config file (`~/.config/5chan/config.json`) is managed via `5chan board add/remove` or manual editing:
@@ -153,6 +119,130 @@ RestartSec=10
 [Install]
 WantedBy=multi-user.target
 ```
+
+## Commands
+
+<!-- commands -->
+* [`5chan board add ADDRESS`](#5chan-board-add-address)
+* [`5chan board list`](#5chan-board-list)
+* [`5chan board remove ADDRESS`](#5chan-board-remove-address)
+* [`5chan help [COMMAND]`](#5chan-help-command)
+* [`5chan start`](#5chan-start)
+
+## `5chan board add ADDRESS`
+
+Add a board to the archiver config
+
+```
+USAGE
+  $ 5chan board add ADDRESS [--rpc-url <value>] [--per-page <value>] [--pages <value>] [--bump-limit <value>]
+    [--archive-purge-seconds <value>]
+
+ARGUMENTS
+  ADDRESS  Subplebbit address to add
+
+FLAGS
+  --archive-purge-seconds=<value>  Seconds after archiving before purge
+  --bump-limit=<value>             Bump limit for threads
+  --pages=<value>                  Number of pages
+  --per-page=<value>               Posts per page
+  --rpc-url=<value>                [default: ws://localhost:9138, env: PLEBBIT_RPC_WS_URL] Plebbit RPC WebSocket URL
+                                   (for validation)
+
+DESCRIPTION
+  Add a board to the archiver config
+
+EXAMPLES
+  $ 5chan board add random.eth
+
+  $ 5chan board add tech.eth --bump-limit 500
+
+  $ 5chan board add flash.eth --per-page 30 --pages 1
+
+  $ 5chan board add my-board.eth --rpc-url ws://custom-host:9138
+```
+
+_See code: [src/commands/board/add.ts](https://github.com/plebbit/5chan_board_custom_community/blob/v0.1.0/src/commands/board/add.ts)_
+
+## `5chan board list`
+
+List all boards in the archiver config
+
+```
+USAGE
+  $ 5chan board list
+
+DESCRIPTION
+  List all boards in the archiver config
+
+EXAMPLES
+  $ 5chan board list
+```
+
+_See code: [src/commands/board/list.ts](https://github.com/plebbit/5chan_board_custom_community/blob/v0.1.0/src/commands/board/list.ts)_
+
+## `5chan board remove ADDRESS`
+
+Remove a board from the archiver config
+
+```
+USAGE
+  $ 5chan board remove ADDRESS
+
+ARGUMENTS
+  ADDRESS  Subplebbit address to remove
+
+DESCRIPTION
+  Remove a board from the archiver config
+
+EXAMPLES
+  $ 5chan board remove random.eth
+```
+
+_See code: [src/commands/board/remove.ts](https://github.com/plebbit/5chan_board_custom_community/blob/v0.1.0/src/commands/board/remove.ts)_
+
+## `5chan help [COMMAND]`
+
+Display help for 5chan.
+
+```
+USAGE
+  $ 5chan help [COMMAND...] [-n]
+
+ARGUMENTS
+  [COMMAND...]  Command to show help for.
+
+FLAGS
+  -n, --nested-commands  Include all nested commands in the output.
+
+DESCRIPTION
+  Display help for 5chan.
+```
+
+_See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v6.2.37/src/commands/help.ts)_
+
+## `5chan start`
+
+Start the archiver, watching the config file for changes
+
+```
+USAGE
+  $ 5chan start [-c <value>]
+
+FLAGS
+  -c, --config=<value>  Path to config file (overrides default)
+
+DESCRIPTION
+  Start the archiver, watching the config file for changes
+
+EXAMPLES
+  $ 5chan start
+
+  $ 5chan start --config /path/to/config.json
+```
+
+_See code: [src/commands/start.ts](https://github.com/plebbit/5chan_board_custom_community/blob/v0.1.0/src/commands/start.ts)_
+<!-- commandsstop -->
 
 ## Config Hot-Reload
 

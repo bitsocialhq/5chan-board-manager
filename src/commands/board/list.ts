@@ -5,6 +5,10 @@ import { loadConfig } from '../../config-manager.js'
 export default class BoardList extends Command {
   static override description = 'List all boards in the archiver config'
 
+  static override examples = [
+    '5chan board list',
+  ]
+
   async run(): Promise<void> {
     const configPath = join(this.config.configDir, 'config.json')
     const config = loadConfig(configPath)

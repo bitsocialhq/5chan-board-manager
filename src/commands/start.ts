@@ -6,6 +6,11 @@ import { startArchiverManager } from '../archiver-manager.js'
 export default class Start extends Command {
   static override description = 'Start the archiver, watching the config file for changes'
 
+  static override examples = [
+    '5chan start',
+    '5chan start --config /path/to/config.json',
+  ]
+
   static override flags = {
     config: Flags.string({
       char: 'c',

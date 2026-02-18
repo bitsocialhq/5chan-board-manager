@@ -14,6 +14,13 @@ export default class BoardAdd extends Command {
 
   static override description = 'Add a board to the archiver config'
 
+  static override examples = [
+    '5chan board add random.eth',
+    '5chan board add tech.eth --bump-limit 500',
+    '5chan board add flash.eth --per-page 30 --pages 1',
+    '5chan board add my-board.eth --rpc-url ws://custom-host:9138',
+  ]
+
   static override flags = {
     'rpc-url': Flags.string({
       description: 'Plebbit RPC WebSocket URL (for validation)',

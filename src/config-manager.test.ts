@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { loadConfig, saveConfig, addBoard, removeBoard, diffBoards } from './config-manager.js'
@@ -192,6 +192,53 @@ describe('saveConfig', () => {
     saveConfig(path, { boards: [{ address: 'b.eth' }] })
     const written = JSON.parse(readFileSync(path, 'utf-8'))
     expect(written.boards[0].address).toBe('b.eth')
+  })
+})
+
+describe('saveConfig atomic write', () => {
+  const dirs: string[] = []
+
+  function tmpDir(): string {
+    const d = makeTmpDir()
+    dirs.push(d)
+    return d
+  }
+
+  afterEach(() => {
+    for (const d of dirs) {
+      rmSync(d, { recursive: true, force: true })
+    }
+    dirs.length = 0
+  })
+
+  it('does not leave a .tmp file after successful write', () => {
+    const dir = tmpDir()
+    const path = join(dir, 'config.json')
+    saveConfig(path, { boards: [{ address: 'a.eth' }] })
+    expect(existsSync(path)).toBe(true)
+    expect(existsSync(path + '.tmp')).toBe(false)
+  })
+
+  it('preserves original config when a leftover .tmp file exists', () => {
+    const dir = tmpDir()
+    const path = join(dir, 'config.json')
+    saveConfig(path, { boards: [{ address: 'original.eth' }] })
+    // Simulate a crash that left a .tmp file
+    writeFileSync(path + '.tmp', 'partial garbage')
+    // Original should still be readable
+    const config = loadConfig(path)
+    expect(config.boards[0].address).toBe('original.eth')
+  })
+
+  it('overwrites leftover .tmp on next successful save', () => {
+    const dir = tmpDir()
+    const path = join(dir, 'config.json')
+    // Leave a stale .tmp file
+    writeFileSync(path + '.tmp', 'stale')
+    saveConfig(path, { boards: [{ address: 'fresh.eth' }] })
+    expect(existsSync(path + '.tmp')).toBe(false)
+    const config = loadConfig(path)
+    expect(config.boards[0].address).toBe('fresh.eth')
   })
 })
 

@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, renameSync, unlinkSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { BoardConfig, MultiArchiverConfig } from './types.js'
 
@@ -92,7 +92,14 @@ function validateNumericFields(obj: Record<string, unknown>, prefix: string, con
  */
 export function saveConfig(configPath: string, config: MultiArchiverConfig): void {
   mkdirSync(dirname(configPath), { recursive: true })
-  writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n')
+  const tmpPath = configPath + '.tmp'
+  try {
+    writeFileSync(tmpPath, JSON.stringify(config, null, 2) + '\n')
+    renameSync(tmpPath, configPath)
+  } catch (err) {
+    try { unlinkSync(tmpPath) } catch {}
+    throw err
+  }
 }
 
 /**

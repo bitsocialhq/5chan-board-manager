@@ -11,7 +11,7 @@
 
 services:
   5chan:
-    image: ghcr.io/plebbit/5chan-board-cli:latest
+    image: ghcr.io/rinse12/5chan-board-manager:latest
     container_name: 5chan
     restart: unless-stopped
     extra_hosts:

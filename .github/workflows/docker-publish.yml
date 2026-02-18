@@ -31,7 +31,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/plebbit/5chan-board-cli
+          images: ghcr.io/rinse12/5chan-board-manager
           tags: |
             type=semver,pattern={{version}},value=${{ steps.previoustag.outputs.tag }}
             type=semver,pattern={{major}}.{{minor}},value=${{ steps.previoustag.outputs.tag }}
@@ -57,11 +57,11 @@ jobs:
         with:
           context: .
           load: true
-          tags: 5chan-board-cli:test
+          tags: 5chan-board-manager:test
           cache-from: type=gha
 
       - name: Smoke test
-        run: docker run --rm 5chan-board-cli:test 5chan --help
+        run: docker run --rm 5chan-board-manager:test 5chan --help
 
       # Full multi-arch build and push (uses cache from the test build)
       - name: Build and push

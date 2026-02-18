@@ -31,7 +31,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/rinse12/5chan-board-manager
+          images: ghcr.io/bitsocialhq/5chan-board-manager
           tags: |
             type=semver,pattern={{version}},value=${{ steps.previoustag.outputs.tag }}
             type=semver,pattern={{major}}.{{minor}},value=${{ steps.previoustag.outputs.tag }}

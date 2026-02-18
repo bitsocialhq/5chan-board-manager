@@ -26,7 +26,7 @@ services:
       retries: 3
 
   5chan:
-    image: ghcr.io/rinse12/5chan-board-manager:latest
+    image: ghcr.io/bitsocialhq/5chan-board-manager:latest
     container_name: 5chan
     restart: unless-stopped
     depends_on:

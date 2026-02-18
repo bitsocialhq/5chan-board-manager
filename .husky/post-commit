@@ -1,0 +1,22 @@
+#!/bin/sh
+# Ensure commit timestamps are UTC
+# Preserves the exact instant using epoch seconds.
+# Avoid recursion if we just amended.
+[ -n "$GIT_POST_COMMIT_UTC" ] && exit 0
+
+# Detect if either author or committer timestamp is not UTC (Z)
+ad=$(git show -s --format=%aI)
+cd=$(git show -s --format=%cI)
+case "$ad" in *Z) ;; *) needs_fix=1;; esac
+case "$cd" in *Z) ;; *) needs_fix=1;; esac
+[ -z "$needs_fix" ] && exit 0
+
+# Preserve exact instants using epoch seconds
+at=$(git show -s --format=%at)
+ct=$(git show -s --format=%ct)
+
+# Re-amend commit with UTC zone
+GIT_POST_COMMIT_UTC=1 \
+GIT_AUTHOR_DATE="@${at} +0000" \
+GIT_COMMITTER_DATE="@${ct} +0000" \
+  git commit --amend --no-edit >/dev/null 2>&1 || true

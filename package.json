@@ -39,7 +39,9 @@
   },
   "scripts": {
     "build": "tsc",
-    "prepare": "npm run build",
+    "commit": "cz",
+    "prepare": "husky && npm run build",
+    "release": "HUSKY=0 release-it --config config/.release-it.json",
     "test": "vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts"
   },
@@ -50,7 +52,19 @@
     "env-paths": "4.0.0"
   },
   "devDependencies": {
+    "@commitlint/cli": "20.4.1",
+    "@commitlint/config-conventional": "20.4.1",
+    "@release-it/conventional-changelog": "10.0.5",
+    "commitizen": "4.3.1",
+    "cz-conventional-changelog": "3.3.0",
+    "husky": "9.1.7",
+    "release-it": "19.2.4",
     "typescript": "5.9.3",
     "vitest": "4.0.18"
+  },
+  "config": {
+    "commitizen": {
+      "path": "cz-conventional-changelog"
+    }
   }
 }

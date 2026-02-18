@@ -131,7 +131,7 @@ The lock is released when the archiver stops.
 
 ## Author-Deleted Comment Purging
 
-The archiver detects comments and replies that were deleted by their author (where `comment.deleted === true`) and purges them via `createCommentModeration({ commentModeration: { purged: true } })`. Purged CIDs are tracked in `purgedDeletedComments` in the state file to avoid reprocessing.
+The archiver detects comments and replies that were deleted by their author (where `comment.deleted === true`) and purges them via `createCommentModeration({ commentModeration: { purged: true } })`. Once purged, the comment is removed from the subplebbit and won't appear in future listings. If a purge hasn't been processed yet, the next cycle may re-publish a redundant purge moderation, which is a harmless no-op.
 
 ## Auto Mod Signer Management
 
@@ -155,16 +155,12 @@ State is stored as one JSON file per subplebbit in the state directory (via `env
   },
   "archivedThreads": {
     "<commentCid>": { "archivedTimestamp": 1234567890 }
-  },
-  "purgedDeletedComments": {
-    "<commentCid>": true
   }
 }
 ```
 
 - **`signers`**: maps subplebbit address → mod signer private key (auto-created if missing)
-- **`archivedThreads`**: maps comment CID → archive metadata
-- **`purgedDeletedComments`**: tracks CIDs of author-deleted comments/replies that have been purged
+- **`archivedThreads`**: maps comment CID → archive metadata (entries removed on purge)
 - State writes use atomic temp-then-rename to prevent corruption
 - Loaded on startup, written on archive, entries removed on purge
 
@@ -388,7 +384,7 @@ Reference: `plebbit-js/src/subplebbit/subplebbit-client-manager.ts:38`, `plebbit
 
 - On each update, scan comments and replies for `deleted === true`
 - Purge via `createCommentModeration({ commentModeration: { purged: true } })`
-- Track purged CIDs in `purgedDeletedComments` to avoid reprocessing
+- Duplicate purge moderations (if subplebbit hasn't processed prior purge yet) are harmless no-ops
 
 ### Module flow
 
@@ -417,9 +413,8 @@ Reference: `plebbit-js/src/subplebbit/subplebbit-client-manager.ts:38`, `plebbit
    f. For each archived thread where (now - archivedAt) > archive_purge_seconds:
       - createCommentModeration({ purged: true }) and publish
       - Remove from state file
-   g. For each author-deleted comment/reply not yet purged:
+   g. For each author-deleted comment/reply:
       - createCommentModeration({ purged: true }) and publish
-      - Track in purgedDeletedComments
 ```
 
 ### Key plebbit-js APIs used

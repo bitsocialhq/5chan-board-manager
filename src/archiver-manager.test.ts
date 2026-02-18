@@ -87,6 +87,23 @@ describe('startArchiverManager', () => {
     await manager.stop()
   })
 
+  it('throws AggregateError when all boards fail to start', async () => {
+    mockStartArchiver
+      .mockRejectedValueOnce(new Error('connection refused'))
+      .mockRejectedValueOnce(new Error('timeout'))
+
+    const dir = tmpDir()
+    const configPath = join(dir, 'config.json')
+    const config: MultiArchiverConfig = {
+      boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
+    }
+    writeFileSync(configPath, JSON.stringify(config))
+
+    await expect(startArchiverManager(configPath, config)).rejects.toThrow(
+      'All 2 board(s) failed to start',
+    )
+  })
+
   it('starts with empty config', async () => {
     const dir = tmpDir()
     const configPath = join(dir, 'config.json')

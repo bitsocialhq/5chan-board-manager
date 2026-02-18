@@ -129,6 +129,25 @@ describe('start command', () => {
     expect(stdout).toContain('Started 1 archiver(s)')
   })
 
+  it('propagates error when startArchiverManager throws', async () => {
+    mockStartManager.mockRejectedValue(
+      new AggregateError(
+        [new Error('connection refused')],
+        'All 1 board(s) failed to start',
+      ),
+    )
+
+    const dir = tmpDir()
+    const configPath = join(dir, 'config.json')
+    writeFileSync(configPath, JSON.stringify({
+      boards: [{ address: 'a.eth' }],
+    }))
+
+    await expect(runCommand([], dir)).rejects.toThrow(
+      'All 1 board(s) failed to start',
+    )
+  })
+
   it('reports failed boards in startup summary', async () => {
     const manager = makeMockManager({
       archivers: new Map([['a.eth', { stop: vi.fn() }]]),

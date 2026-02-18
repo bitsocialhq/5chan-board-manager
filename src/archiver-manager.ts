@@ -42,6 +42,13 @@ export async function startArchiverManager(
     }
   }
 
+  if (archivers.size === 0 && errors.size > 0) {
+    throw new AggregateError(
+      [...errors.values()],
+      `All ${errors.size} board(s) failed to start`,
+    )
+  }
+
   async function handleConfigChange(): Promise<void> {
     if (reloading || stopped) return
     reloading = true

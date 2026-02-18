@@ -1,14 +1,8 @@
 # 5chan Board CLI
 
-An ESM TypeScript npm package that implements 4chan-style thread auto-archiving and purging for plebbit-js subplebbits. Uses plebbit-js's public API (`plebbit.createCommentModeration()`) — **no plebbit-js modifications required**.
+A CLI tool that implements 4chan-style thread auto-archiving and purging for Bitsocial communities.
 
-> **Node.js only.** This is a Node.js-only ESM package — it requires a running Plebbit RPC server and uses Node.js APIs (`fs`, `node:util`). Start [bitsocial-cli](https://github.com/bitsocialhq/bitsocial-cli) first to get a Plebbit RPC server running, then point this package at it. Apps using it as a library (like 5chan) must run the archiver in a Node.js environment, not in the browser.
-
-Works two ways:
-1. **CLI** — unified `5chan` command with subcommands for starting archivers and managing boards
-2. **Library** — imported by 5chan (web UI) as a dependency
-
-## CLI Usage
+## Usage
 
 The `5chan` binary provides subcommands for managing boards and running archivers.
 
@@ -237,87 +231,6 @@ Uses `plebbit-logger` (same logger as the plebbit-js ecosystem). Key events logg
 - Config hot-reload events
 - Mod role auto-added
 - Errors
-
-## Library API
-
-```ts
-import { startArchiver } from '5chan-board-cli'
-
-const archiver = await startArchiver({
-  subplebbitAddress: 'my-board.eth',
-  plebbitRpcUrl: 'ws://localhost:9138', // Plebbit RPC WebSocket URL
-  stateDir: '/custom/state/dir',       // optional, defaults to OS data dir
-  perPage: 15,    // optional, default 15
-  pages: 10,      // optional, default 10
-  bumpLimit: 300, // optional, default 300
-  archivePurgeSeconds: 172800, // optional, default 172800 (48h)
-})
-
-// Later, to stop:
-await archiver.stop()
-```
-
-- `plebbitRpcUrl` is the WebSocket URL of a running Plebbit RPC server (Plebbit instance is created and destroyed internally)
-- `stateDir` is the directory for per-subplebbit state files (default: `~/.local/share/5chan-archiver/5chan_archiver_states/`)
-- Returns `{ stop(): Promise<void> }` — stops the archiver, cleans up event listeners, and destroys the Plebbit instance
-
-### Multi-Board Library API
-
-```ts
-import { loadMultiConfig, startMultiArchiver } from '5chan-board-cli'
-
-const config = loadMultiConfig('archiver-config.json')
-const result = await startMultiArchiver(config)
-
-console.log(`Started: ${result.archivers.size}, Failed: ${result.errors.size}`)
-
-// Graceful shutdown
-await result.stop()
-```
-
-For config-watching with hot-reload (same behavior as `5chan start`):
-
-```ts
-import { loadConfig, startArchiverManager } from '5chan-board-cli'
-
-const configPath = '/path/to/config.json'
-const config = loadConfig(configPath)
-const manager = await startArchiverManager(configPath, config)
-
-// manager watches config file and auto-starts/stops archivers
-// manager.archivers — Map of running archivers
-// manager.errors — Map of failed archivers
-
-await manager.stop()
-```
-
-### All Exports
-
-```ts
-// Core archiver
-export { startArchiver } from '5chan-board-cli'
-
-// Multi-board (static — no hot-reload)
-export { loadMultiConfig, resolveArchiverOptions, startMultiArchiver } from '5chan-board-cli'
-
-// Config management (for hot-reload and board commands)
-export { loadConfig, saveConfig, addBoard, removeBoard, diffBoards } from '5chan-board-cli'
-
-// Board validation
-export { validateBoardAddress } from '5chan-board-cli'
-
-// Archiver manager (hot-reload)
-export { startArchiverManager } from '5chan-board-cli'
-
-// State
-export { defaultStateDir } from '5chan-board-cli'
-
-// Types
-export type {
-  ArchiverOptions, ArchiverResult, BoardConfig, BoardDefaults,
-  MultiArchiverConfig, MultiArchiverResult, ArchiverManager,
-} from '5chan-board-cli'
-```
 
 ## 4chan Board Behavior Reference
 

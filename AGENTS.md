@@ -1,7 +1,9 @@
-- posts are the equivalent plebbit-js term for "board" in 5chan
+- communities or subplebbit are the equivalent plebbit-js term for "board" in 5chan
 - Subplebbits are equivalent to community, which are essentially the same as boards in 5chan
 - Every new feature or bug fix must include a test case that reproduces/covers it
 - Never use `any` — always use proper types
 - After modifying any file under `src/`, run `npx tsc --noEmit` to verify the build has no type errors
 - After modifying types in `src/types.ts`, run `npx tsc --noEmit` to ensure all dependents still compile
 - All code must work on Linux, macOS, and Windows — avoid platform-specific assumptions (paths, line endings, shell commands, etc.)
+- Assume environment is node v22+
+- When changing functionality (new features, refactors, CLI changes, etc.), update README.md if the change affects documented behavior, commands, APIs, or examples

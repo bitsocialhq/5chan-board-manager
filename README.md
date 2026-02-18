@@ -2,62 +2,49 @@
 
 An ESM TypeScript npm package that implements 4chan-style thread auto-archiving and purging for plebbit-js subplebbits. Uses plebbit-js's public API (`plebbit.createCommentModeration()`) — **no plebbit-js modifications required**.
 
-> **Node.js only.** This is a Node.js-only ESM package — it requires a Plebbit RPC server connection and uses Node.js APIs (`fs`, `node:util`). Apps using it as a library (like 5chan) must run the archiver in a Node.js environment, not in the browser.
+> **Node.js only.** This is a Node.js-only ESM package — it requires a running Plebbit RPC server and uses Node.js APIs (`fs`, `node:util`). Start [bitsocial-cli](https://github.com/bitsocialhq/bitsocial-cli) first to get a Plebbit RPC server running, then point this package at it. Apps using it as a library (like 5chan) must run the archiver in a Node.js environment, not in the browser.
 
-Works three ways:
-1. **Library** — imported by 5chan (web UI) as a dependency
-2. **Single-board CLI** — `5chan-archiver <subplebbit-address> [--flags]`
-3. **Multi-board CLI** — `5chan-archiver-multi <config.json>`
-
-## Library API
-
-```ts
-import { startArchiver } from '5chan-board-cli'
-
-const archiver = await startArchiver({
-  subplebbitAddress: 'my-board.eth',
-  plebbitRpcUrl: 'ws://localhost:9138', // Plebbit RPC WebSocket URL
-  statePath: '/custom/path/state.json', // optional, defaults to OS data dir
-  perPage: 15,    // optional, default 15
-  pages: 10,      // optional, default 10
-  bumpLimit: 300, // optional, default 300
-  archivePurgeSeconds: 172800, // optional, default 172800 (48h)
-})
-
-// Later, to stop:
-await archiver.stop()
-```
-
-- `plebbitRpcUrl` is the WebSocket URL of a running Plebbit RPC server (Plebbit instance is created and destroyed internally)
-- Returns `{ stop(): Promise<void> }` — stops the archiver, cleans up event listeners, and destroys the Plebbit instance
+Works two ways:
+1. **CLI** — unified `5chan` command with subcommands for starting archivers and managing boards
+2. **Library** — imported by 5chan (web UI) as a dependency
 
 ## CLI Usage
 
-```bash
-node --env-file=.env dist/cli.js <subplebbit-address> [--rpc-url URL] [--per-page N] [--pages N] [--bump-limit N] [--archive-purge-seconds N] [--state-path PATH]
-```
+The `5chan` binary provides subcommands for managing boards and running archivers.
 
-- Uses Node 22's built-in `--env-file` flag (no dotenv dependency)
-- CLI flags override `.env` values
-- `<subplebbit-address>` is a required positional argument
-
-Or via npm script:
+### Starting the archiver
 
 ```bash
-npm start -- <subplebbit-address> [--flags]
+5chan start [--config PATH]
 ```
 
-## Multi-Board Usage
+- Reads the config file at `~/.config/5chan/config.json` by default, or from `--config PATH`
+- Starts one archiver per configured board
+- Watches the config file for changes and auto-starts/stops archivers (hot-reload)
+- Handles `SIGINT`/`SIGTERM` for graceful shutdown
 
-Run archivers for multiple boards in a single process using a JSON config file:
+### Managing boards
+
+Add, list, and remove boards from the config file:
 
 ```bash
-5chan-archiver-multi archiver-config.json
-# or
-5chan-archiver-multi --config archiver-config.json
+# Add a board (validates it exists on the RPC node)
+5chan board add <address> [--rpc-url URL] [--per-page N] [--pages N] [--bump-limit N] [--archive-purge-seconds N]
+
+# List configured boards
+5chan board list
+
+# Remove a board
+5chan board remove <address>
 ```
+
+- `board add` validates the address against the Plebbit RPC node before adding
+- `--rpc-url` defaults to `PLEBBIT_RPC_WS_URL` env var, then `ws://localhost:9138`
+- Per-board settings (`--per-page`, `--pages`, `--bump-limit`, `--archive-purge-seconds`) are optional overrides
 
 ### Config File Format
+
+The config file (`~/.config/5chan/config.json`) is managed via `5chan board add/remove` or manual editing:
 
 ```json
 {
@@ -85,21 +72,7 @@ All fields except `boards[].address` are optional:
 - `defaults` — applied to all boards unless overridden per-board
 - Per-board fields (`perPage`, `pages`, `bumpLimit`, `archivePurgeSeconds`) override `defaults`
 
-### Multi-Board Library API
-
-```ts
-import { loadMultiConfig, startMultiArchiver } from '5chan-board-cli'
-
-const config = loadMultiConfig('archiver-config.json')
-const result = await startMultiArchiver(config)
-
-console.log(`Started: ${result.archivers.size}, Failed: ${result.errors.size}`)
-
-// Graceful shutdown
-await result.stop()
-```
-
-### Docker Example
+## Docker Example
 
 ```dockerfile
 FROM node:22-slim
@@ -107,15 +80,16 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY dist/ dist/
+COPY bin/ bin/
 VOLUME /data
-CMD ["node", "dist/cli-multi.js", "/data/archiver-config.json"]
+CMD ["node", "bin/run.js", "start", "--config", "/data/config.json"]
 ```
 
 ```bash
 docker run -v /host/data:/data my-archiver
 ```
 
-### systemd Service Example
+## systemd Service Example
 
 ```ini
 [Unit]
@@ -124,7 +98,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/node /opt/5chan-archiver/dist/cli-multi.js /etc/5chan-archiver/config.json
+ExecStart=/usr/bin/node /opt/5chan-archiver/bin/run.js start --config /etc/5chan-archiver/config.json
 Restart=on-failure
 RestartSec=10
 
@@ -132,18 +106,32 @@ RestartSec=10
 WantedBy=multi-user.target
 ```
 
-## .env Configuration
+## Config Hot-Reload
 
-```env
-PLEBBIT_RPC_WS_URL=ws://localhost:9138  # optional, defaults to ws://localhost:9138
-ARCHIVER_STATE_PATH=                     # optional, defaults to OS data dir (~/.local/share/5chan-archiver/state.json)
-PER_PAGE=15
-PAGES=10
-BUMP_LIMIT=300
-ARCHIVE_PURGE_SECONDS=172800
-```
+`5chan start` watches the config file using `fs.watch()` with a 200ms debounce. When the file changes:
 
-No mod private key in `.env` — signers are auto-managed in the state JSON per subplebbit (see below).
+1. Loads and validates the new config
+2. Diffs old vs new boards
+3. Stops archivers for removed boards
+4. Starts archivers for added boards
+5. Logs the delta: `config reloaded: +N added, -N removed, M running`
+
+This means you can add or remove boards while the archiver is running — either by editing the config file directly or by running `5chan board add/remove` in another terminal.
+
+## File Locking
+
+Each archiver acquires a PID-based lock file (`{statePath}.lock`) to prevent concurrent archivers on the same board. On startup:
+
+1. Attempts to create lock file exclusively (`wx` flag)
+2. If lock exists, reads the PID and checks if it's still alive (`process.kill(pid, 0)`)
+3. If alive — throws `Another archiver (PID N) is already running`
+4. If stale — removes the old lock and retries
+
+The lock is released when the archiver stops.
+
+## Author-Deleted Comment Purging
+
+The archiver detects comments and replies that were deleted by their author (where `comment.deleted === true`) and purges them via `createCommentModeration({ commentModeration: { purged: true } })`. Purged CIDs are tracked in `purgedDeletedComments` in the state file to avoid reprocessing.
 
 ## Auto Mod Signer Management
 
@@ -158,7 +146,7 @@ Logged via `plebbit-logger` when creating signer or adding mod role.
 
 ## State Persistence
 
-`archivedAt` is not in plebbit-js's schema, so the script persists state to a JSON file in the OS data directory (via `env-paths`: `~/.local/share/5chan-archiver/state.json`) or a custom path via `--state-path` / `ARCHIVER_STATE_PATH`.
+State is stored as one JSON file per subplebbit in the state directory (via `env-paths`: `~/.local/share/5chan-archiver/5chan_archiver_states/{address}.json`) or a custom directory via `stateDir` in the config.
 
 ```json
 {
@@ -167,14 +155,17 @@ Logged via `plebbit-logger` when creating signer or adding mod role.
   },
   "archivedThreads": {
     "<commentCid>": { "archivedTimestamp": 1234567890 }
+  },
+  "purgedDeletedComments": {
+    "<commentCid>": true
   }
 }
 ```
 
 - **`signers`**: maps subplebbit address → mod signer private key (auto-created if missing)
 - **`archivedThreads`**: maps comment CID → archive metadata
-- Top-level object allows adding future state categories
-- Per-entry objects allow adding future metadata
+- **`purgedDeletedComments`**: tracks CIDs of author-deleted comments/replies that have been purged
+- State writes use atomic temp-then-rename to prevent corruption
 - Loaded on startup, written on archive, entries removed on purge
 
 ## Cold Start
@@ -192,8 +183,91 @@ Uses `plebbit-logger` (same logger as the plebbit-js ecosystem). Key events logg
 - Archiver start/stop
 - Threads archived (with CID and reason: capacity vs bump limit)
 - Threads purged
+- Author-deleted comments purged
+- Config hot-reload events
 - Mod role auto-added
 - Errors
+
+## Library API
+
+```ts
+import { startArchiver } from '5chan-board-cli'
+
+const archiver = await startArchiver({
+  subplebbitAddress: 'my-board.eth',
+  plebbitRpcUrl: 'ws://localhost:9138', // Plebbit RPC WebSocket URL
+  stateDir: '/custom/state/dir',       // optional, defaults to OS data dir
+  perPage: 15,    // optional, default 15
+  pages: 10,      // optional, default 10
+  bumpLimit: 300, // optional, default 300
+  archivePurgeSeconds: 172800, // optional, default 172800 (48h)
+})
+
+// Later, to stop:
+await archiver.stop()
+```
+
+- `plebbitRpcUrl` is the WebSocket URL of a running Plebbit RPC server (Plebbit instance is created and destroyed internally)
+- `stateDir` is the directory for per-subplebbit state files (default: `~/.local/share/5chan-archiver/5chan_archiver_states/`)
+- Returns `{ stop(): Promise<void> }` — stops the archiver, cleans up event listeners, and destroys the Plebbit instance
+
+### Multi-Board Library API
+
+```ts
+import { loadMultiConfig, startMultiArchiver } from '5chan-board-cli'
+
+const config = loadMultiConfig('archiver-config.json')
+const result = await startMultiArchiver(config)
+
+console.log(`Started: ${result.archivers.size}, Failed: ${result.errors.size}`)
+
+// Graceful shutdown
+await result.stop()
+```
+
+For config-watching with hot-reload (same behavior as `5chan start`):
+
+```ts
+import { loadConfig, startArchiverManager } from '5chan-board-cli'
+
+const configPath = '/path/to/config.json'
+const config = loadConfig(configPath)
+const manager = await startArchiverManager(configPath, config)
+
+// manager watches config file and auto-starts/stops archivers
+// manager.archivers — Map of running archivers
+// manager.errors — Map of failed archivers
+
+await manager.stop()
+```
+
+### All Exports
+
+```ts
+// Core archiver
+export { startArchiver } from '5chan-board-cli'
+
+// Multi-board (static — no hot-reload)
+export { loadMultiConfig, resolveArchiverOptions, startMultiArchiver } from '5chan-board-cli'
+
+// Config management (for hot-reload and board commands)
+export { loadConfig, saveConfig, addBoard, removeBoard, diffBoards } from '5chan-board-cli'
+
+// Board validation
+export { validateBoardAddress } from '5chan-board-cli'
+
+// Archiver manager (hot-reload)
+export { startArchiverManager } from '5chan-board-cli'
+
+// State
+export { defaultStateDir } from '5chan-board-cli'
+
+// Types
+export type {
+  ArchiverOptions, ArchiverResult, BoardConfig, BoardDefaults,
+  MultiArchiverConfig, MultiArchiverResult, ArchiverManager,
+} from '5chan-board-cli'
+```
 
 ## 4chan Board Behavior Reference
 
@@ -310,6 +384,12 @@ Reference: `plebbit-js/src/subplebbit/subplebbit-client-manager.ts:38`, `plebbit
 - Track when threads were archived
 - After `archive_purge_seconds` has elapsed since archiving → purge via `createCommentModeration({ commentModeration: { purged: true } })`
 
+### Feature 4: Author-deleted comment purging
+
+- On each update, scan comments and replies for `deleted === true`
+- Purge via `createCommentModeration({ commentModeration: { purged: true } })`
+- Track purged CIDs in `purgedDeletedComments` to avoid reprocessing
+
 ### Module flow
 
 ```
@@ -317,8 +397,9 @@ Reference: `plebbit-js/src/subplebbit/subplebbit-client-manager.ts:38`, `plebbit
 2. Load state JSON; get or create signer for this subplebbit via plebbit.createSigner()
 3. Get subplebbit (LocalSubplebbit or RpcLocalSubplebbit)
 4. Check subplebbit.roles for signer address; if missing, subplebbit.edit() to add as mod
-5. Call subplebbit.update()
-6. On each 'update' event:
+5. Acquire file lock to prevent concurrent archivers on same board
+6. Call subplebbit.update()
+7. On each 'update' event:
    a. Determine thread source (three scenarios):
       1. pageCids.active exists → fetch via getPage(), paginate via nextCid
       2. Only pages.hot exists → use preloaded page, sort by lastReplyTimestamp desc then postNumber
@@ -336,6 +417,9 @@ Reference: `plebbit-js/src/subplebbit/subplebbit-client-manager.ts:38`, `plebbit
    f. For each archived thread where (now - archivedAt) > archive_purge_seconds:
       - createCommentModeration({ purged: true }) and publish
       - Remove from state file
+   g. For each author-deleted comment/reply not yet purged:
+      - createCommentModeration({ purged: true }) and publish
+      - Track in purgedDeletedComments
 ```
 
 ### Key plebbit-js APIs used

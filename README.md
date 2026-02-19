@@ -73,18 +73,18 @@ See [`docker-compose.example.yml`](docker-compose.example.yml) for the full conf
 
 #### Quick usage (Docker, full stack)
 
-Use this flow to create a new community/subplebbit/board with `bitsocial-cli` and immediately add it to 5chan:
+Use this flow to create a new board with `bitsocial-cli` and immediately add it to 5chan:
 
 ```bash
 cp docker-compose.example.yml docker-compose.yml
 docker compose up -d
 
-# Create a community (defaults to ws://localhost:9138; copy the created address from output)
+# Create a community (copy the created address from output)
 docker compose exec bitsocial bitsocial community create \
   --title "My Board" \
   --description "Managed by 5chan"
 
-# Add the created community/subplebbit/board to 5chan
+# Add the created community to 5chan board manager
 docker compose exec 5chan 5chan board add <community-address> --apply-defaults
 
 # Verify it was added
@@ -148,38 +148,19 @@ docker run -d -v /path/to/data:/data 5chan-board-manager
 
 ### Board creation and defaults preset
 
-If you are not using the Docker quick usage flow above, create the community/subplebbit/board with `bitsocial community create` first, then add it to 5chan with `5chan board add`.
+If you are not using the Docker quick usage flow above, create the board with `bitsocial community create` first, then add it to 5chan with `5chan board add`.
 
-When you run `5chan board add`:
+Run `5chan board add --help` for full details on preset defaults flags (`--apply-defaults`, `--skip-apply-defaults`, `--interactive-apply-defaults`). In interactive terminals, defaults are shown with an `[A]ccept / [M]odify / [S]kip` prompt; choosing Modify opens the preset in `$EDITOR`.
 
-- Interactive terminals: prompts to apply the 5chan preset defaults, with default answer **yes**
-- Non-interactive mode (CI, pipes): requires explicit `--apply-defaults` or `--skip-apply-defaults`
-- Custom preset JSON: pass `--defaults-preset /path/to/preset.json`
+Preset JSON is validated with Zod.
 
-Preset JSON is validated with Zod. Schema:
+`boardSettings` must follow plebbit-js `SubplebbitEditOptions`:
+https://github.com/plebbit/plebbit-js?tab=readme-ov-file#subplebbiteditoptions
 
-```json
-{
-  "boardSettings": {
-    "features": {
-      "noUpvotes": true,
-      "noDownvotes": true,
-      "requirePostLinkIsMedia": true,
-      "requirePostLink": true,
-      "requireReplyLink": false,
-      "pseudonymityMode": "per-post"
-    }
-  },
-  "boardManagerSettings": {
-    "perPage": 15,
-    "pages": 10,
-    "bumpLimit": 300,
-    "archivePurgeSeconds": 172800
-  }
-}
-```
+Bundled preset JSON defaults:
+[`src/presets/community-defaults.json`](src/presets/community-defaults.json)
 
-`boardSettings` is merged into `subplebbit.edit()` with "missing only" semantics. `boardManagerSettings` is used as default values for `board add` config fields, and explicit CLI flags still win.
+`boardSettings` is merged into `subplebbit.edit()` with "missing only" semantics (only absent values are applied). `boardManagerSettings` is used as default values for `board add` config fields, and explicit CLI flags override these defaults.
 
 The bundled preset file is `src/presets/community-defaults.json`.
 
@@ -200,24 +181,36 @@ Add a board to the config
 ```
 USAGE
   $ 5chan board add ADDRESS [--rpc-url <value>] [--per-page <value>] [--pages <value>] [--bump-limit <value>]
-    [--archive-purge-seconds <value>] [--apply-defaults] [--skip-apply-defaults] [--defaults-preset <value>]
+    [--archive-purge-seconds <value>] [--apply-defaults] [--skip-apply-defaults] [--interactive-apply-defaults]
+    [--defaults-preset <value>]
 
 ARGUMENTS
   ADDRESS  Subplebbit address to add
 
 FLAGS
-  --apply-defaults                 Apply preset defaults before adding to config
+  --apply-defaults                 Apply preset defaults silently (no prompts)
   --archive-purge-seconds=<value>  Seconds after archiving before purge
   --bump-limit=<value>             Bump limit for threads
   --defaults-preset=<value>        Path to a custom preset JSON file
+  --interactive-apply-defaults     Interactively review and modify preset defaults before applying
   --pages=<value>                  Number of pages
   --per-page=<value>               Posts per page
   --rpc-url=<value>                [default: ws://localhost:9138, env: PLEBBIT_RPC_WS_URL] Plebbit RPC WebSocket URL
                                    (for validation)
-  --skip-apply-defaults            Skip applying preset defaults before adding to config
+  --skip-apply-defaults            Skip applying preset defaults
 
 DESCRIPTION
   Add a board to the config
+
+  Preset defaults behavior:
+    --apply-defaults              Apply all preset defaults silently (no prompts)
+    --skip-apply-defaults         Skip preset defaults silently
+    --interactive-apply-defaults  Review defaults, accept all, modify in $EDITOR, or skip (requires TTY)
+    Interactive TTY (no flags)    Same as --interactive-apply-defaults: shows [A]ccept / [M]odify / [S]kip
+    Non-interactive (no flags)    Errors; requires --apply-defaults or --skip-apply-defaults
+
+  When choosing [M]odify, the preset opens in your editor ($VISUAL > $EDITOR > vi/notepad).
+  Modified presets are validated before applying; invalid changes fail the command.
 
 EXAMPLES
   $ 5chan board add random.eth
@@ -231,6 +224,8 @@ EXAMPLES
   $ 5chan board add my-board.eth --apply-defaults
 
   $ 5chan board add my-board.eth --skip-apply-defaults
+
+  $ 5chan board add my-board.eth --interactive-apply-defaults
 
   $ 5chan board add my-board.eth --apply-defaults --defaults-preset ./my-preset.json
 ```
@@ -247,7 +242,7 @@ USAGE
     [--archive-purge-seconds <value>] [--reset <value>]
 
 ARGUMENTS
-  ADDRESS  Subplebbit address to edit
+  ADDRESS  Board address to edit
 
 FLAGS
   --archive-purge-seconds=<value>  Seconds after archiving before purge
@@ -298,7 +293,7 @@ USAGE
   $ 5chan board remove ADDRESS
 
 ARGUMENTS
-  ADDRESS  Subplebbit address to remove
+  ADDRESS  Board address to remove
 
 DESCRIPTION
   Remove a board from the config

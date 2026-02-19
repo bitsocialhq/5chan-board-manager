@@ -9,14 +9,14 @@ import type { Subplebbit } from './types.js'
 type SubplebbitEditOptions = Parameters<Subplebbit['edit']>[0]
 type ParseSubplebbitEditOptionsFn = (editOptions: SubplebbitEditOptions) => SubplebbitEditOptions
 
-const BoardManagerSettingsSchema = z.object({
+export const BoardManagerSettingsSchema = z.object({
   perPage: z.number().int().positive().optional(),
   pages: z.number().int().positive().optional(),
   bumpLimit: z.number().int().positive().optional(),
   archivePurgeSeconds: z.number().int().positive().optional(),
 }).strict()
 
-const CommunityDefaultsPresetBaseSchema = z.object({
+export const CommunityDefaultsPresetBaseSchema = z.object({
   boardSettings: z.record(z.string(), z.unknown()),
   boardManagerSettings: BoardManagerSettingsSchema,
 }).strict()
@@ -45,7 +45,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-async function getParseSubplebbitEditOptions(): Promise<ParseSubplebbitEditOptionsFn> {
+export async function getParseSubplebbitEditOptions(): Promise<ParseSubplebbitEditOptionsFn> {
   if (parseSubplebbitEditOptionsOverride) {
     return parseSubplebbitEditOptionsOverride
   }
@@ -78,7 +78,7 @@ export function setParseSubplebbitEditOptionsOverrideForTests(
   parseSubplebbitEditOptionsOverride = parser
 }
 
-function formatZodIssues(error: z.ZodError): string {
+export function formatZodIssues(error: z.ZodError): string {
   return error.issues
     .map((issue) => {
       const path = issue.path.length > 0 ? issue.path.join('.') : '(root)'

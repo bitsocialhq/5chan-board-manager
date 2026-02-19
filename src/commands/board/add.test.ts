@@ -9,8 +9,18 @@ vi.mock('../../board-validator.js', () => ({
 
 vi.mock('../../community-defaults.js', () => ({
   applyCommunityDefaultsToBoard: vi.fn(),
+  BoardManagerSettingsSchema: { safeParse: vi.fn(() => ({ success: true, data: {} })) },
+  CommunityDefaultsPresetBaseSchema: { safeParse: vi.fn(() => ({ success: true, data: {} })) },
+  formatZodIssues: vi.fn(() => 'mock error'),
   getCommunityDefaultsPreset: vi.fn(),
+  getParseSubplebbitEditOptions: vi.fn(),
   loadCommunityDefaultsPreset: vi.fn(),
+}))
+
+vi.mock('../../preset-editor.js', () => ({
+  flattenPreset: vi.fn(() => []),
+  formatPresetDisplay: vi.fn(() => 'Preset defaults for "mock":'),
+  openPresetInEditor: vi.fn(),
 }))
 
 import { validateBoardAddress } from '../../board-validator.js'
@@ -19,6 +29,7 @@ import {
   getCommunityDefaultsPreset,
   loadCommunityDefaultsPreset,
 } from '../../community-defaults.js'
+import type { CommunityDefaultsPreset } from '../../community-defaults.js'
 import { loadConfig } from '../../config-manager.js'
 import BoardAdd from './add.js'
 
@@ -29,7 +40,17 @@ const mockLoadPreset = vi.mocked(loadCommunityDefaultsPreset)
 
 interface RunCommandOptions {
   interactive?: boolean
-  promptAnswer?: boolean
+  interactiveResult?: CommunityDefaultsPreset | 'skip'
+}
+
+const DEFAULT_PRESET: CommunityDefaultsPreset = {
+  boardSettings: { features: { noUpvotes: true } },
+  boardManagerSettings: {
+    perPage: 15,
+    pages: 10,
+    bumpLimit: 300,
+    archivePurgeSeconds: 172800,
+  },
 }
 
 function makeTmpDir(): string {
@@ -59,8 +80,10 @@ async function runCommand(
     stderr += String(warnArgs[0]) + '\n'
   }) as typeof cmd.warn
   ;(cmd as unknown as { isInteractive: () => boolean }).isInteractive = () => options.interactive ?? true
-  ;(cmd as unknown as { promptApplyDefaults: () => Promise<boolean> }).promptApplyDefaults = async () =>
-    options.promptAnswer ?? true
+  ;(cmd as unknown as { promptInteractiveDefaults: (address: string, preset: CommunityDefaultsPreset) => Promise<CommunityDefaultsPreset | 'skip'> }).promptInteractiveDefaults = async (
+    _address: string,
+    preset: CommunityDefaultsPreset,
+  ) => options.interactiveResult ?? preset
 
   await cmd.run()
 
@@ -82,15 +105,7 @@ describe('board add command', () => {
     mockApplyDefaults.mockReset()
     mockApplyDefaults.mockResolvedValue({ applied: true, changedFields: ['features'] })
     mockGetPreset.mockReset()
-    mockGetPreset.mockResolvedValue({
-      boardSettings: { features: { noUpvotes: true } },
-      boardManagerSettings: {
-        perPage: 15,
-        pages: 10,
-        bumpLimit: 300,
-        archivePurgeSeconds: 172800,
-      },
-    })
+    mockGetPreset.mockResolvedValue(DEFAULT_PRESET)
     mockLoadPreset.mockReset()
     mockLoadPreset.mockResolvedValue({
       boardSettings: { features: { requirePostLink: true } },
@@ -196,7 +211,35 @@ describe('board add command', () => {
     const dir = tmpDir()
     await expect(
       runCommand(['board.eth', '--apply-defaults', '--skip-apply-defaults'], dir),
-    ).rejects.toThrow('Cannot use both --apply-defaults and --skip-apply-defaults')
+    ).rejects.toThrow('Only one of --apply-defaults, --skip-apply-defaults, or --interactive-apply-defaults')
+  })
+
+  it('errors when apply and interactive flags are provided', async () => {
+    const dir = tmpDir()
+    await expect(
+      runCommand(['board.eth', '--apply-defaults', '--interactive-apply-defaults'], dir),
+    ).rejects.toThrow('Only one of --apply-defaults, --skip-apply-defaults, or --interactive-apply-defaults')
+  })
+
+  it('errors when skip and interactive flags are provided', async () => {
+    const dir = tmpDir()
+    await expect(
+      runCommand(['board.eth', '--skip-apply-defaults', '--interactive-apply-defaults'], dir),
+    ).rejects.toThrow('Only one of --apply-defaults, --skip-apply-defaults, or --interactive-apply-defaults')
+  })
+
+  it('errors when all three flags are provided', async () => {
+    const dir = tmpDir()
+    await expect(
+      runCommand(['board.eth', '--apply-defaults', '--skip-apply-defaults', '--interactive-apply-defaults'], dir),
+    ).rejects.toThrow('Only one of --apply-defaults, --skip-apply-defaults, or --interactive-apply-defaults')
+  })
+
+  it('errors when --interactive-apply-defaults is used in non-interactive mode', async () => {
+    const dir = tmpDir()
+    await expect(
+      runCommand(['board.eth', '--interactive-apply-defaults'], dir, { interactive: false }),
+    ).rejects.toThrow('--interactive-apply-defaults requires an interactive terminal (TTY)')
   })
 
   it('errors in non-interactive mode when no defaults decision flag is provided', async () => {
@@ -218,10 +261,35 @@ describe('board add command', () => {
     expect(mockApplyDefaults).toHaveBeenCalledOnce()
   })
 
-  it('uses prompt answer when no defaults decision flag is provided', async () => {
+  it('skips defaults when interactive prompt returns skip', async () => {
     const dir = tmpDir()
-    await runCommand(['board.eth'], dir, { promptAnswer: false })
+    await runCommand(['board.eth'], dir, { interactiveResult: 'skip' })
     expect(mockApplyDefaults).not.toHaveBeenCalled()
+  })
+
+  it('applies modified preset when interactive prompt returns modified values', async () => {
+    const dir = tmpDir()
+    const modifiedPreset: CommunityDefaultsPreset = {
+      boardSettings: { features: { noUpvotes: false } },
+      boardManagerSettings: {
+        perPage: 50,
+        pages: 5,
+        bumpLimit: 100,
+        archivePurgeSeconds: 86400,
+      },
+    }
+    await runCommand(['board.eth'], dir, { interactiveResult: modifiedPreset })
+    expect(mockApplyDefaults).toHaveBeenCalledWith(
+      'board.eth',
+      'ws://localhost:9138',
+      modifiedPreset,
+    )
+
+    const config = loadConfig(join(dir, 'config.json'))
+    expect(config.boards[0].perPage).toBe(50)
+    expect(config.boards[0].pages).toBe(5)
+    expect(config.boards[0].bumpLimit).toBe(100)
+    expect(config.boards[0].archivePurgeSeconds).toBe(86400)
   })
 
   it('loads custom preset file when --defaults-preset is provided', async () => {
@@ -272,5 +340,26 @@ describe('board add command', () => {
     const dir = tmpDir()
     const { stdout } = await runCommand(['board.eth'], dir)
     expect(stdout).toContain('Added board "board.eth"')
+  })
+
+  it('board config has no preset values when defaults are skipped', async () => {
+    const dir = tmpDir()
+    await runCommand(['board.eth', '--skip-apply-defaults'], dir, { interactive: false })
+
+    const config = loadConfig(join(dir, 'config.json'))
+    expect(config.boards[0]).toEqual({ address: 'board.eth' })
+  })
+
+  it('cli flag overrides override interactive preset values', async () => {
+    const dir = tmpDir()
+    await runCommand(
+      ['board.eth', '--per-page', '99'],
+      dir,
+      { interactiveResult: DEFAULT_PRESET },
+    )
+
+    const config = loadConfig(join(dir, 'config.json'))
+    expect(config.boards[0].perPage).toBe(99)
+    expect(config.boards[0].pages).toBe(10)
   })
 })

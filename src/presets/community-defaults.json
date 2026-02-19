@@ -7,6 +7,74 @@
       "requirePostLink": true,
       "requireReplyLink": false,
       "pseudonymityMode": "per-post"
+    },
+    "settings": {
+      "challenges": [
+        {
+          "name": "fail",
+          "description": "Blocks authors with excessive failed captcha attempts.",
+          "options": {
+            "error": "Too many failed attempts. Try again later."
+          },
+          "exclude": [
+            { "role": ["moderator", "admin", "owner"] },
+            { "rateLimit": 5, "rateLimitChallengeSuccess": false }
+          ]
+        },
+        {
+          "name": "fail",
+          "description": "Disables CommentEdit publications on this board.",
+          "options": {
+            "error": "Comment edits are disabled on this board."
+          },
+          "exclude": [
+            { "role": ["moderator", "admin", "owner"] },
+            {
+              "publicationType": {
+                "post": true,
+                "reply": true,
+                "vote": true,
+                "commentModeration": true,
+                "subplebbitEdit": true
+              }
+            }
+          ]
+        },
+        {
+          "name": "captcha-canvas-v3",
+          "description": "Post captcha for untrusted or rate-exceeded users.",
+          "pendingApproval": true,
+          "options": {
+            "characters": "6",
+            "width": "280",
+            "height": "96",
+            "colors": "#2f9e44,#1c7ed6,#e8590c"
+          },
+          "exclude": [
+            { "publicationType": { "reply": true } },
+            { "role": ["moderator", "admin", "owner"] },
+            { "postCount": 10, "firstCommentTimestamp": 604800, "rateLimit": 3, "rateLimitChallengeSuccess": true },
+            { "replyCount": 20, "firstCommentTimestamp": 604800, "rateLimit": 3, "rateLimitChallengeSuccess": true }
+          ]
+        },
+        {
+          "name": "captcha-canvas-v3",
+          "description": "Reply captcha for untrusted or rate-exceeded users.",
+          "pendingApproval": true,
+          "options": {
+            "characters": "5",
+            "width": "260",
+            "height": "90",
+            "colors": "#2f9e44,#1c7ed6,#e8590c"
+          },
+          "exclude": [
+            { "publicationType": { "post": true } },
+            { "role": ["moderator", "admin", "owner"] },
+            { "postCount": 10, "firstCommentTimestamp": 604800, "rateLimit": 6, "rateLimitChallengeSuccess": true },
+            { "replyCount": 20, "firstCommentTimestamp": 604800, "rateLimit": 6, "rateLimitChallengeSuccess": true }
+          ]
+        }
+      ]
     }
   },
   "boardManagerSettings": {

@@ -1,4 +1,4 @@
-import Plebbit from '@plebbit/plebbit-js'
+import { connectToPlebbitRpc } from './plebbit-rpc.js'
 import Logger from '@plebbit/plebbit-logger'
 import { join } from 'node:path'
 import { loadState, saveState, defaultStateDir, acquireLock } from './state.js'
@@ -40,7 +40,7 @@ export async function startBoardManager(options: BoardManagerOptions): Promise<B
 
   log(`starting board manager for ${subplebbitAddress} (capacity=${maxThreads}, bumpLimit=${bumpLimit}, purgeAfter=${archivePurgeSeconds}s)`)
 
-  const plebbit = await Plebbit({ plebbitRpcClientsOptions: [plebbitRpcUrl] })
+  const plebbit = await connectToPlebbitRpc(plebbitRpcUrl)
 
   async function ensureModRole(subplebbit: Subplebbit, signerAddress: string): Promise<void> {
     const roles = subplebbit.roles ?? {}

@@ -4,10 +4,13 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { loadState, saveState } from './state.js'
 import type { BoardManagerState, PlebbitInstance, Page, ThreadComment } from './types.js'
-import Plebbit from '@plebbit/plebbit-js'
 import { startBoardManager } from './board-manager.js'
 
-vi.mock('@plebbit/plebbit-js')
+vi.mock('./plebbit-rpc.js', () => ({
+  connectToPlebbitRpc: vi.fn(),
+}))
+
+import { connectToPlebbitRpc } from './plebbit-rpc.js'
 
 // Helper to create a mock thread
 function mockThread(cid: string, overrides: Record<string, unknown> = {}): ThreadComment {
@@ -39,7 +42,7 @@ function createMockPlebbit() {
     destroy: vi.fn().mockResolvedValue(undefined),
   } as unknown as PlebbitInstance
 
-  vi.mocked(Plebbit).mockResolvedValue(instance)
+  vi.mocked(connectToPlebbitRpc).mockResolvedValue(instance)
 
   return {
     instance,

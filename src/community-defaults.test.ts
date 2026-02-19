@@ -3,11 +3,11 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-vi.mock('@plebbit/plebbit-js', () => ({
-  default: vi.fn(),
+vi.mock('./plebbit-rpc.js', () => ({
+  connectToPlebbitRpc: vi.fn(),
 }))
 
-import Plebbit from '@plebbit/plebbit-js'
+import { connectToPlebbitRpc } from './plebbit-rpc.js'
 import {
   applyCommunityDefaultsToBoard,
   buildCommunityDefaultsPatch,
@@ -17,7 +17,7 @@ import {
 } from './community-defaults.js'
 import type { PlebbitInstance, Subplebbit } from './types.js'
 
-const mockPlebbit = vi.mocked(Plebbit)
+const mockConnect = vi.mocked(connectToPlebbitRpc)
 
 function makeTmpDir(): string {
   return mkdtempSync(join(tmpdir(), 'community-defaults-test-'))
@@ -184,7 +184,7 @@ describe('buildCommunityDefaultsPatch', () => {
 
 describe('applyCommunityDefaultsToBoard', () => {
   beforeEach(() => {
-    mockPlebbit.mockReset()
+    mockConnect.mockReset()
   })
 
   it('applies defaults and edits subplebbit when patch is non-empty', async () => {
@@ -193,7 +193,7 @@ describe('applyCommunityDefaultsToBoard', () => {
       settings: {},
     })
     const instance = createMockPlebbitInstance(subplebbit)
-    mockPlebbit.mockResolvedValue(instance)
+    mockConnect.mockResolvedValue(instance)
 
     const result = await applyCommunityDefaultsToBoard('board.eth', 'ws://localhost:9138', {
       boardSettings: {
@@ -218,7 +218,7 @@ describe('applyCommunityDefaultsToBoard', () => {
       settings: { fetchThumbnailUrls: false },
     })
     const instance = createMockPlebbitInstance(subplebbit)
-    mockPlebbit.mockResolvedValue(instance)
+    mockConnect.mockResolvedValue(instance)
 
     const result = await applyCommunityDefaultsToBoard('board.eth', 'ws://localhost:9138', {
       boardSettings: {
@@ -237,7 +237,7 @@ describe('applyCommunityDefaultsToBoard', () => {
     const destroy = vi.fn<PlebbitInstance['destroy']>().mockResolvedValue(undefined)
     const getSubplebbit = vi.fn<PlebbitInstance['getSubplebbit']>().mockRejectedValue(new Error('lookup failed'))
     const instance = { getSubplebbit, destroy } as unknown as PlebbitInstance
-    mockPlebbit.mockResolvedValue(instance)
+    mockConnect.mockResolvedValue(instance)
 
     await expect(applyCommunityDefaultsToBoard('board.eth', 'ws://localhost:9138', {
       boardSettings: {},

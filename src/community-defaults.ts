@@ -1,4 +1,4 @@
-import Plebbit from '@plebbit/plebbit-js'
+import { connectToPlebbitRpc } from './plebbit-rpc.js'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
@@ -195,7 +195,7 @@ export async function applyCommunityDefaultsToBoard(
   rpcUrl: string,
   preset: CommunityDefaultsPreset,
 ): Promise<ApplyCommunityDefaultsResult> {
-  const plebbit = await Plebbit({ plebbitRpcClientsOptions: [rpcUrl] })
+  const plebbit = await connectToPlebbitRpc(rpcUrl)
 
   try {
     const subplebbit = await plebbit.getSubplebbit({ address })

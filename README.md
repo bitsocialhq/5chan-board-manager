@@ -71,6 +71,26 @@ docker compose up -d
 
 See [`docker-compose.example.yml`](docker-compose.example.yml) for the full configuration.
 
+#### Quick usage (Docker, full stack)
+
+Use this flow to create a new community/subplebbit/board with `bitsocial-cli` and immediately add it to 5chan:
+
+```bash
+cp docker-compose.example.yml docker-compose.yml
+docker compose up -d
+
+# Create a community (defaults to ws://localhost:9138; copy the created address from output)
+docker compose exec bitsocial bitsocial community create \
+  --title "My Board" \
+  --description "Managed by 5chan"
+
+# Add the created community/subplebbit/board to 5chan
+docker compose exec 5chan 5chan board add <community-address> --apply-defaults
+
+# Verify it was added
+docker compose exec 5chan 5chan board list
+```
+
 #### Standalone (bitsocial-cli already running)
 
 If you **already** have bitsocial-cli running separately (on the host, in another compose stack, etc.), use the standalone compose file which only runs 5chan:
@@ -91,7 +111,7 @@ See [`docker-compose.standalone.example.yml`](docker-compose.standalone.example.
 
 ### Running commands inside Docker
 
-Use `docker compose exec` to run `5chan` CLI commands inside the running container:
+Use `docker compose exec` to run additional `5chan` CLI commands inside the running container:
 
 ```bash
 # Add a board
@@ -128,7 +148,7 @@ docker run -d -v /path/to/data:/data 5chan-board-manager
 
 ### Board creation and defaults preset
 
-Create the community (subplebbit/board) with `bitsocial community create` first, then add it to 5chan with `5chan board add`.
+If you are not using the Docker quick usage flow above, create the community/subplebbit/board with `bitsocial community create` first, then add it to 5chan with `5chan board add`.
 
 When you run `5chan board add`:
 

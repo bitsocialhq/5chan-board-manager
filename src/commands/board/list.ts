@@ -1,5 +1,4 @@
 import { Command } from '@oclif/core'
-import { join } from 'node:path'
 import { loadConfig } from '../../config-manager.js'
 
 export default class BoardList extends Command {
@@ -10,10 +9,10 @@ export default class BoardList extends Command {
   ]
 
   async run(): Promise<void> {
-    const configPath = join(this.config.configDir, 'config.json')
-    const config = loadConfig(configPath)
+    const configDir = this.config.configDir
+    const config = loadConfig(configDir)
 
-    this.log(`Config: ${configPath}`)
+    this.log(`Config: ${configDir}`)
     this.log(`RPC URL: ${config.rpcUrl ?? '(default: ws://localhost:9138)'}`)
 
     if (config.boards.length === 0) {

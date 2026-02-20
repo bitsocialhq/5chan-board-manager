@@ -1,6 +1,5 @@
 import { Args, Command } from '@oclif/core'
-import { join } from 'node:path'
-import { loadConfig, saveConfig, removeBoard } from '../../config-manager.js'
+import { deleteBoardConfig } from '../../config-manager.js'
 
 export default class BoardRemove extends Command {
   static override args = {
@@ -18,12 +17,10 @@ export default class BoardRemove extends Command {
 
   async run(): Promise<void> {
     const { args } = await this.parse(BoardRemove)
-    const configPath = join(this.config.configDir, 'config.json')
+    const configDir = this.config.configDir
 
-    const config = loadConfig(configPath)
-    const updated = removeBoard(config, args.address)
-    saveConfig(configPath, updated)
+    deleteBoardConfig(configDir, args.address)
 
-    this.log(`Removed board "${args.address}" from ${configPath}`)
+    this.log(`Removed board "${args.address}" from ${configDir}`)
   }
 }

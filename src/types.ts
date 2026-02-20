@@ -77,6 +77,13 @@ export interface BoardDefaults {
   moderationReasons?: ModerationReasons
 }
 
+/** Global config stored in global.json */
+export interface GlobalConfig {
+  rpcUrl?: string
+  stateDir?: string
+  defaults?: BoardDefaults
+}
+
 /** Top-level multi-board JSON config */
 export interface MultiBoardConfig {
   rpcUrl?: string

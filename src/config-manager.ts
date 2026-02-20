@@ -1,80 +1,215 @@
-import { readFileSync, writeFileSync, mkdirSync, renameSync, unlinkSync } from 'node:fs'
-import { dirname } from 'node:path'
-import type { BoardConfig, ModerationReasons, MultiBoardConfig } from './types.js'
+import { readFileSync, writeFileSync, mkdirSync, renameSync, unlinkSync, readdirSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import type { BoardConfig, GlobalConfig, ModerationReasons, MultiBoardConfig } from './types.js'
+
+/** Return the path to global.json inside a config directory */
+export function globalConfigPath(configDir: string): string {
+  return join(configDir, 'global.json')
+}
+
+/** Return the path to a board config file inside the boards/ subdirectory */
+export function boardConfigPath(configDir: string, address: string): string {
+  return join(configDir, 'boards', `${address}.json`)
+}
 
 /**
- * Load a config file from disk.
- * Returns a default config with empty boards on ENOENT.
+ * Load a full MultiBoardConfig by reading global.json + boards/*.json.
+ * Returns a default config with empty boards when directories/files are missing.
  * Throws on invalid JSON or validation errors.
  */
-export function loadConfig(configPath: string): MultiBoardConfig {
+export function loadConfig(configDir: string): MultiBoardConfig {
+  const global = loadGlobalConfig(configDir)
+  const boards = loadAllBoardConfigs(configDir)
+
+  return {
+    ...global,
+    boards,
+  }
+}
+
+/**
+ * Load global.json from a config directory.
+ * Returns {} on ENOENT. Throws on invalid JSON or validation errors.
+ */
+export function loadGlobalConfig(configDir: string): GlobalConfig {
+  const filePath = globalConfigPath(configDir)
   let raw: string
   try {
-    raw = readFileSync(configPath, 'utf-8')
+    raw = readFileSync(filePath, 'utf-8')
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      return { boards: [] }
+      return {}
     }
-    throw new Error(`Failed to read config file "${configPath}": ${(err as Error).message}`)
+    throw new Error(`Failed to read global config "${filePath}": ${(err as Error).message}`)
   }
 
   let parsed: unknown
   try {
     parsed = JSON.parse(raw)
   } catch (err) {
-    throw new Error(`Invalid JSON in config file "${configPath}": ${(err as Error).message}`)
+    throw new Error(`Invalid JSON in global config "${filePath}": ${(err as Error).message}`)
   }
 
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new Error(`Config file "${configPath}" must contain a JSON object`)
+    throw new Error(`Global config "${filePath}" must contain a JSON object`)
   }
 
   const config = parsed as Record<string, unknown>
 
-  if (config.boards !== undefined && !Array.isArray(config.boards)) {
-    throw new Error(`Config file "${configPath}": "boards" must be an array`)
-  }
-
   if (config.rpcUrl !== undefined && typeof config.rpcUrl !== 'string') {
-    throw new Error(`Config file "${configPath}": "rpcUrl" must be a string`)
+    throw new Error(`Global config "${filePath}": "rpcUrl" must be a string`)
   }
 
   if (config.stateDir !== undefined && typeof config.stateDir !== 'string') {
-    throw new Error(`Config file "${configPath}": "stateDir" must be a string`)
+    throw new Error(`Global config "${filePath}": "stateDir" must be a string`)
   }
 
   if (config.defaults !== undefined) {
     if (typeof config.defaults !== 'object' || config.defaults === null || Array.isArray(config.defaults)) {
-      throw new Error(`Config file "${configPath}": "defaults" must be an object`)
+      throw new Error(`Global config "${filePath}": "defaults" must be an object`)
     }
-    validateNumericFields(config.defaults as Record<string, unknown>, 'defaults', configPath)
-    validateModerationReasons(config.defaults as Record<string, unknown>, 'defaults', configPath)
+    validateNumericFields(config.defaults as Record<string, unknown>, 'defaults', filePath)
+    validateModerationReasons(config.defaults as Record<string, unknown>, 'defaults', filePath)
   }
 
-  const boards = (config.boards ?? []) as unknown[]
+  return config as unknown as GlobalConfig
+}
+
+/**
+ * Load a single board config file.
+ * Throws on ENOENT, invalid JSON, or validation errors.
+ */
+export function loadBoardConfig(filePath: string): BoardConfig {
+  let raw: string
+  try {
+    raw = readFileSync(filePath, 'utf-8')
+  } catch (err) {
+    throw new Error(`Failed to read board config "${filePath}": ${(err as Error).message}`)
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch (err) {
+    throw new Error(`Invalid JSON in board config "${filePath}": ${(err as Error).message}`)
+  }
+
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error(`Board config "${filePath}" must contain a JSON object`)
+  }
+
+  const board = parsed as Record<string, unknown>
+
+  if (typeof board.address !== 'string' || board.address.trim() === '') {
+    throw new Error(`Board config "${filePath}": address must be a non-empty string`)
+  }
+
+  validateNumericFields(board, 'board', filePath)
+  validateModerationReasons(board, 'board', filePath)
+
+  return board as unknown as BoardConfig
+}
+
+/**
+ * Load all board configs from the boards/ subdirectory.
+ * Returns [] if the directory doesn't exist.
+ * Validates each file and checks for duplicates.
+ */
+function loadAllBoardConfigs(configDir: string): BoardConfig[] {
+  const boardsDir = join(configDir, 'boards')
+  let entries: string[]
+  try {
+    entries = readdirSync(boardsDir)
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return []
+    }
+    throw new Error(`Failed to read boards directory "${boardsDir}": ${(err as Error).message}`)
+  }
+
+  const jsonFiles = entries.filter((f) => f.endsWith('.json')).sort()
+  const boards: BoardConfig[] = []
   const seen = new Set<string>()
-  for (let i = 0; i < boards.length; i++) {
-    const board = boards[i] as Record<string, unknown>
-    if (typeof board !== 'object' || board === null || Array.isArray(board)) {
-      throw new Error(`Config file "${configPath}": boards[${i}] must be an object`)
+
+  for (const file of jsonFiles) {
+    const filePath = join(boardsDir, file)
+    const board = loadBoardConfig(filePath)
+
+    // Validate filename matches address
+    const expectedFilename = `${board.address}.json`
+    if (file !== expectedFilename) {
+      throw new Error(`Board config "${filePath}": filename "${file}" does not match address "${board.address}" (expected "${expectedFilename}")`)
     }
-    if (typeof board.address !== 'string' || board.address.trim() === '') {
-      throw new Error(`Config file "${configPath}": boards[${i}].address must be a non-empty string`)
-    }
+
     if (seen.has(board.address)) {
-      throw new Error(`Config file "${configPath}": duplicate board address "${board.address}"`)
+      throw new Error(`Board config "${filePath}": duplicate board address "${board.address}"`)
     }
     seen.add(board.address)
-    validateNumericFields(board, `boards[${i}]`, configPath)
-    validateModerationReasons(board, `boards[${i}]`, configPath)
+    boards.push(board)
   }
 
-  // Ensure boards key exists even if missing from file
-  if (!config.boards) {
-    (config as Record<string, unknown>).boards = []
+  return boards
+}
+
+/**
+ * Save global config to global.json with atomic write.
+ */
+export function saveGlobalConfig(configDir: string, config: GlobalConfig): void {
+  const filePath = globalConfigPath(configDir)
+  atomicWriteJson(filePath, config)
+}
+
+/**
+ * Save a board config to boards/{address}.json with atomic write.
+ */
+export function saveBoardConfig(configDir: string, board: BoardConfig): void {
+  const filePath = boardConfigPath(configDir, board.address)
+  atomicWriteJson(filePath, board)
+}
+
+/**
+ * Delete a board config file. Throws if file not found.
+ */
+export function deleteBoardConfig(configDir: string, address: string): void {
+  const filePath = boardConfigPath(configDir, address)
+  try {
+    unlinkSync(filePath)
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      throw new Error(`Board "${address}" not found in config`)
+    }
+    throw err
+  }
+}
+
+/**
+ * Update an existing board's config.
+ * Fields in `updates` are merged onto the existing board.
+ * Fields listed in `resetFields` are removed (reverts to defaults).
+ * Returns the updated board config.
+ */
+export function updateBoardConfig(
+  board: BoardConfig,
+  updates: Partial<Omit<BoardConfig, 'address'>>,
+  resetFields?: ReadonlyArray<keyof Omit<BoardConfig, 'address'>>,
+): BoardConfig {
+  if (resetFields) {
+    for (const field of resetFields) {
+      if (field in updates) {
+        throw new Error(`Cannot set and reset the same field "${field}"`)
+      }
+    }
   }
 
-  return config as unknown as MultiBoardConfig
+  const updated: BoardConfig = { ...board, ...updates }
+
+  if (resetFields) {
+    for (const field of resetFields) {
+      delete updated[field]
+    }
+  }
+
+  return updated
 }
 
 function validateNumericFields(obj: Record<string, unknown>, prefix: string, configPath: string): void {
@@ -104,88 +239,6 @@ function validateModerationReasons(obj: Record<string, unknown>, prefix: string,
     if (typeof reasons[key] !== 'string') {
       throw new Error(`Config file "${configPath}": ${prefix}.moderationReasons.${key} must be a string`)
     }
-  }
-}
-
-/**
- * Save a config to disk with pretty-printed JSON.
- * Creates parent directories if needed.
- */
-export function saveConfig(configPath: string, config: MultiBoardConfig): void {
-  mkdirSync(dirname(configPath), { recursive: true })
-  const tmpPath = configPath + '.tmp'
-  try {
-    writeFileSync(tmpPath, JSON.stringify(config, null, 2) + '\n')
-    renameSync(tmpPath, configPath)
-  } catch (err) {
-    try { unlinkSync(tmpPath) } catch {}
-    throw err
-  }
-}
-
-/**
- * Add a board to the config. Throws if the address already exists.
- */
-export function addBoard(config: MultiBoardConfig, board: BoardConfig): MultiBoardConfig {
-  if (config.boards.some((b) => b.address === board.address)) {
-    throw new Error(`Board "${board.address}" already exists in config`)
-  }
-  return {
-    ...config,
-    boards: [...config.boards, board],
-  }
-}
-
-/**
- * Remove a board from the config by address. Throws if not found.
- */
-export function removeBoard(config: MultiBoardConfig, address: string): MultiBoardConfig {
-  const idx = config.boards.findIndex((b) => b.address === address)
-  if (idx === -1) {
-    throw new Error(`Board "${address}" not found in config`)
-  }
-  return {
-    ...config,
-    boards: config.boards.filter((b) => b.address !== address),
-  }
-}
-
-/**
- * Update an existing board's config. Throws if not found.
- * Fields in `updates` are merged onto the existing board.
- * Fields listed in `resetFields` are removed (reverts to defaults).
- */
-export function updateBoard(
-  config: MultiBoardConfig,
-  address: string,
-  updates: Partial<Omit<BoardConfig, 'address'>>,
-  resetFields?: ReadonlyArray<keyof Omit<BoardConfig, 'address'>>,
-): MultiBoardConfig {
-  const idx = config.boards.findIndex((b) => b.address === address)
-  if (idx === -1) {
-    throw new Error(`Board "${address}" not found in config`)
-  }
-
-  if (resetFields) {
-    for (const field of resetFields) {
-      if (field in updates) {
-        throw new Error(`Cannot set and reset the same field "${field}"`)
-      }
-    }
-  }
-
-  const existing = config.boards[idx]
-  const updated: BoardConfig = { ...existing, ...updates }
-
-  if (resetFields) {
-    for (const field of resetFields) {
-      delete updated[field]
-    }
-  }
-
-  return {
-    ...config,
-    boards: config.boards.map((b, i) => (i === idx ? updated : b)),
   }
 }
 
@@ -234,4 +287,17 @@ export function diffBoards(
   }
 
   return { added, removed, changed }
+}
+
+/** Atomic write: write to .tmp, then rename */
+function atomicWriteJson(filePath: string, data: unknown): void {
+  mkdirSync(dirname(filePath), { recursive: true })
+  const tmpPath = filePath + '.tmp'
+  try {
+    writeFileSync(tmpPath, JSON.stringify(data, null, 2) + '\n')
+    renameSync(tmpPath, filePath)
+  } catch (err) {
+    try { unlinkSync(tmpPath) } catch {}
+    throw err
+  }
 }

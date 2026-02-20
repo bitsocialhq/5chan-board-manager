@@ -1,7 +1,6 @@
 import { Args, Command, Flags } from '@oclif/core'
 import { createInterface } from 'node:readline/promises'
-import { join } from 'node:path'
-import { loadConfig, saveConfig, addBoard } from '../../config-manager.js'
+import { loadConfig, saveBoardConfig } from '../../config-manager.js'
 import { validateBoardAddress } from '../../board-validator.js'
 import {
   applyCommunityDefaultsToBoard,
@@ -185,12 +184,12 @@ Modified presets are validated before applying; invalid changes fail the command
 
   async run(): Promise<void> {
     const { args, flags } = await this.parse(BoardAdd)
-    const configPath = join(this.config.configDir, 'config.json')
+    const configDir = this.config.configDir
 
     await validateBoardAddress(args.address, flags['rpc-url'])
 
     // Early duplicate check — fail before interactive prompts or RPC edits
-    let config = loadConfig(configPath)
+    const config = loadConfig(configDir)
     if (config.boards.some((b) => b.address === args.address)) {
       this.error(`Board "${args.address}" already exists in config`)
     }
@@ -245,9 +244,8 @@ Modified presets are validated before applying; invalid changes fail the command
     if (flags['bump-limit'] !== undefined) board.bumpLimit = flags['bump-limit']
     if (flags['archive-purge-seconds'] !== undefined) board.archivePurgeSeconds = flags['archive-purge-seconds']
 
-    config = addBoard(config, board)
-    saveConfig(configPath, config)
+    saveBoardConfig(configDir, board)
 
-    this.log(`Added board "${args.address}" to ${configPath}`)
+    this.log(`Added board "${args.address}" to ${configDir}`)
   }
 }

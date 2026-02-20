@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
@@ -55,6 +55,12 @@ const DEFAULT_PRESET: CommunityDefaultsPreset = {
 
 function makeTmpDir(): string {
   return mkdtempSync(join(tmpdir(), 'board-add-test-'))
+}
+
+function writeBoardConfig(dir: string, board: { address: string;[key: string]: unknown }): void {
+  const boardsDir = join(dir, 'boards')
+  mkdirSync(boardsDir, { recursive: true })
+  writeFileSync(join(boardsDir, `${board.address}.json`), JSON.stringify(board))
 }
 
 async function runCommand(
@@ -126,8 +132,7 @@ describe('board add command', () => {
     const dir = tmpDir()
     await runCommand(['new-board.eth'], dir)
 
-    const configPath = join(dir, 'config.json')
-    const config = loadConfig(configPath)
+    const config = loadConfig(dir)
     expect(config.boards).toHaveLength(1)
     expect(config.boards[0]).toEqual({
       address: 'new-board.eth',
@@ -165,8 +170,7 @@ describe('board add command', () => {
       '--archive-purge-seconds', '86400',
     ], dir)
 
-    const configPath = join(dir, 'config.json')
-    const config = loadConfig(configPath)
+    const config = loadConfig(dir)
     expect(config.boards[0]).toEqual({
       address: 'board.eth',
       perPage: 25,
@@ -176,33 +180,20 @@ describe('board add command', () => {
     })
   })
 
-  it('appends to existing boards', async () => {
+  it('does not overwrite existing boards', async () => {
     const dir = tmpDir()
-    const configPath = join(dir, 'config.json')
-    writeFileSync(configPath, JSON.stringify({
-      boards: [{ address: 'existing.eth' }],
-    }))
+    writeBoardConfig(dir, { address: 'existing.eth' })
 
     await runCommand(['new.eth'], dir)
 
-    const config = loadConfig(configPath)
+    const config = loadConfig(dir)
     expect(config.boards).toHaveLength(2)
-    expect(config.boards[0].address).toBe('existing.eth')
-    expect(config.boards[1]).toEqual({
-      address: 'new.eth',
-      perPage: 15,
-      pages: 10,
-      bumpLimit: 300,
-      archivePurgeSeconds: 172800,
-    })
+    expect(config.boards.map((b) => b.address).sort()).toEqual(['existing.eth', 'new.eth'])
   })
 
   it('throws when board already exists', async () => {
     const dir = tmpDir()
-    const configPath = join(dir, 'config.json')
-    writeFileSync(configPath, JSON.stringify({
-      boards: [{ address: 'dup.eth' }],
-    }))
+    writeBoardConfig(dir, { address: 'dup.eth' })
 
     await expect(runCommand(['dup.eth'], dir)).rejects.toThrow('already exists')
     expect(mockApplyDefaults).not.toHaveBeenCalled()
@@ -210,10 +201,7 @@ describe('board add command', () => {
 
   it('duplicate check runs before interactive prompt', async () => {
     const dir = tmpDir()
-    const configPath = join(dir, 'config.json')
-    writeFileSync(configPath, JSON.stringify({
-      boards: [{ address: 'dup.eth' }],
-    }))
+    writeBoardConfig(dir, { address: 'dup.eth' })
 
     const promptSpy = vi.fn()
     const cmd = new BoardAdd(['dup.eth'], {} as never)
@@ -310,7 +298,7 @@ describe('board add command', () => {
       modifiedPreset,
     )
 
-    const config = loadConfig(join(dir, 'config.json'))
+    const config = loadConfig(dir)
     expect(config.boards[0].perPage).toBe(50)
     expect(config.boards[0].pages).toBe(5)
     expect(config.boards[0].bumpLimit).toBe(100)
@@ -333,23 +321,20 @@ describe('board add command', () => {
 
     expect(mockLoadPreset).toHaveBeenCalledWith(presetPath)
 
-    const config = loadConfig(join(dir, 'config.json'))
+    const config = loadConfig(dir)
     expect(config.boards[0].perPage).toBe(25)
   })
 
   it('fails command and does not add board if applying defaults fails', async () => {
     const dir = tmpDir()
-    const configPath = join(dir, 'config.json')
-    writeFileSync(configPath, JSON.stringify({
-      boards: [{ address: 'existing.eth' }],
-    }))
+    writeBoardConfig(dir, { address: 'existing.eth' })
 
     mockApplyDefaults.mockRejectedValue(new Error('no moderator rights'))
     await expect(
       runCommand(['new.eth', '--apply-defaults'], dir, { interactive: false }),
     ).rejects.toThrow('no moderator rights')
 
-    const config = loadConfig(configPath)
+    const config = loadConfig(dir)
     expect(config.boards).toHaveLength(1)
     expect(config.boards[0].address).toBe('existing.eth')
   })
@@ -371,7 +356,7 @@ describe('board add command', () => {
     const dir = tmpDir()
     await runCommand(['board.eth', '--skip-apply-defaults'], dir, { interactive: false })
 
-    const config = loadConfig(join(dir, 'config.json'))
+    const config = loadConfig(dir)
     expect(config.boards[0]).toEqual({ address: 'board.eth' })
   })
 
@@ -383,8 +368,15 @@ describe('board add command', () => {
       { interactiveResult: DEFAULT_PRESET },
     )
 
-    const config = loadConfig(join(dir, 'config.json'))
+    const config = loadConfig(dir)
     expect(config.boards[0].perPage).toBe(99)
     expect(config.boards[0].pages).toBe(10)
+  })
+
+  it('creates board file in boards/ directory', async () => {
+    const dir = tmpDir()
+    await runCommand(['my-board.eth', '--skip-apply-defaults'], dir, { interactive: false })
+
+    expect(existsSync(join(dir, 'boards', 'my-board.eth.json'))).toBe(true)
   })
 })

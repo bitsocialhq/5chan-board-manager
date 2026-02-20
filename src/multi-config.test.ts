@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { loadMultiConfig, resolveBoardManagerOptions } from './multi-config.js'
@@ -9,10 +9,16 @@ function makeTmpDir(): string {
   return mkdtempSync(join(tmpdir(), 'multi-config-test-'))
 }
 
-function writeConfig(dir: string, data: unknown): string {
-  const path = join(dir, 'config.json')
-  writeFileSync(path, JSON.stringify(data))
-  return path
+function writeGlobalConfig(dir: string, config: unknown): void {
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'global.json'), JSON.stringify(config))
+}
+
+function writeBoardConfig(dir: string, board: unknown): void {
+  const boardsDir = join(dir, 'boards')
+  mkdirSync(boardsDir, { recursive: true })
+  const b = board as { address: string }
+  writeFileSync(join(boardsDir, `${b.address}.json`), JSON.stringify(board))
 }
 
 describe('loadMultiConfig', () => {
@@ -33,8 +39,8 @@ describe('loadMultiConfig', () => {
 
   it('loads a minimal valid config', () => {
     const dir = tmpDir()
-    const path = writeConfig(dir, { boards: [{ address: 'board.eth' }] })
-    const config = loadMultiConfig(path)
+    writeBoardConfig(dir, { address: 'board.eth' })
+    const config = loadMultiConfig(dir)
     expect(config.boards).toHaveLength(1)
     expect(config.boards[0].address).toBe('board.eth')
     expect(config.rpcUrl).toBeUndefined()
@@ -44,181 +50,133 @@ describe('loadMultiConfig', () => {
 
   it('loads a full config with all fields', () => {
     const dir = tmpDir()
-    const path = writeConfig(dir, {
+    writeGlobalConfig(dir, {
       rpcUrl: 'ws://custom:9138',
       stateDir: '/data/state',
       defaults: { perPage: 20, pages: 5, bumpLimit: 400, archivePurgeSeconds: 86400 },
-      boards: [
-        { address: 'a.eth' },
-        { address: 'b.eth', bumpLimit: 600 },
-      ],
     })
-    const config = loadMultiConfig(path)
+    writeBoardConfig(dir, { address: 'a.eth' })
+    writeBoardConfig(dir, { address: 'b.eth', bumpLimit: 600 })
+
+    const config = loadMultiConfig(dir)
     expect(config.rpcUrl).toBe('ws://custom:9138')
     expect(config.stateDir).toBe('/data/state')
     expect(config.defaults?.perPage).toBe(20)
     expect(config.boards).toHaveLength(2)
-    expect(config.boards[1].bumpLimit).toBe(600)
+    expect(config.boards.find((b) => b.address === 'b.eth')?.bumpLimit).toBe(600)
   })
 
-  it('throws on non-existent file', () => {
-    expect(() => loadMultiConfig('/no/such/file.json')).toThrow('Failed to read config file')
-  })
-
-  it('throws on invalid JSON', () => {
+  it('throws when no board files exist', () => {
     const dir = tmpDir()
-    const path = join(dir, 'bad.json')
-    writeFileSync(path, '{ not valid json }')
-    expect(() => loadMultiConfig(path)).toThrow('Invalid JSON')
+    writeGlobalConfig(dir, { rpcUrl: 'ws://x' })
+    expect(() => loadMultiConfig(dir)).toThrow('no board config files found')
   })
 
-  it('throws when config is not an object', () => {
+  it('throws when boards/ directory is empty', () => {
     const dir = tmpDir()
-    const path = writeConfig(dir, [1, 2, 3])
-    expect(() => loadMultiConfig(path)).toThrow('must contain a JSON object')
-  })
-
-  it('throws when boards is missing', () => {
-    const dir = tmpDir()
-    const path = writeConfig(dir, { rpcUrl: 'ws://x' })
-    expect(() => loadMultiConfig(path)).toThrow('"boards" must be a non-empty array')
-  })
-
-  it('throws when boards is empty', () => {
-    const dir = tmpDir()
-    const path = writeConfig(dir, { boards: [] })
-    expect(() => loadMultiConfig(path)).toThrow('"boards" must be a non-empty array')
+    mkdirSync(join(dir, 'boards'), { recursive: true })
+    expect(() => loadMultiConfig(dir)).toThrow('no board config files found')
   })
 
   it('throws when a board has no address', () => {
     const dir = tmpDir()
-    const path = writeConfig(dir, { boards: [{ perPage: 10 }] })
-    expect(() => loadMultiConfig(path)).toThrow('boards[0].address must be a non-empty string')
+    const boardsDir = join(dir, 'boards')
+    mkdirSync(boardsDir, { recursive: true })
+    writeFileSync(join(boardsDir, 'noaddress.json'), JSON.stringify({ perPage: 10 }))
+    expect(() => loadMultiConfig(dir)).toThrow('address must be a non-empty string')
   })
 
   it('throws when a board has empty address', () => {
     const dir = tmpDir()
-    const path = writeConfig(dir, { boards: [{ address: '  ' }] })
-    expect(() => loadMultiConfig(path)).toThrow('boards[0].address must be a non-empty string')
-  })
-
-  it('throws on duplicate addresses', () => {
-    const dir = tmpDir()
-    const path = writeConfig(dir, {
-      boards: [{ address: 'dup.eth' }, { address: 'dup.eth' }],
-    })
-    expect(() => loadMultiConfig(path)).toThrow('duplicate board address "dup.eth"')
+    const boardsDir = join(dir, 'boards')
+    mkdirSync(boardsDir, { recursive: true })
+    writeFileSync(join(boardsDir, '  .json'), JSON.stringify({ address: '  ' }))
+    expect(() => loadMultiConfig(dir)).toThrow('address must be a non-empty string')
   })
 
   it('throws when a numeric field is not a positive integer', () => {
     const dir = tmpDir()
-    const path = writeConfig(dir, {
-      boards: [{ address: 'x.eth', perPage: -1 }],
-    })
-    expect(() => loadMultiConfig(path)).toThrow('boards[0].perPage must be a positive integer')
+    writeBoardConfig(dir, { address: 'x.eth', perPage: -1 })
+    expect(() => loadMultiConfig(dir)).toThrow('perPage must be a positive integer')
   })
 
   it('throws when a numeric field is a float', () => {
     const dir = tmpDir()
-    const path = writeConfig(dir, {
-      boards: [{ address: 'x.eth', pages: 1.5 }],
-    })
-    expect(() => loadMultiConfig(path)).toThrow('boards[0].pages must be a positive integer')
+    writeBoardConfig(dir, { address: 'x.eth', pages: 1.5 })
+    expect(() => loadMultiConfig(dir)).toThrow('pages must be a positive integer')
   })
 
   it('throws when a numeric field is zero', () => {
     const dir = tmpDir()
-    const path = writeConfig(dir, {
-      boards: [{ address: 'x.eth', bumpLimit: 0 }],
-    })
-    expect(() => loadMultiConfig(path)).toThrow('boards[0].bumpLimit must be a positive integer')
+    writeBoardConfig(dir, { address: 'x.eth', bumpLimit: 0 })
+    expect(() => loadMultiConfig(dir)).toThrow('bumpLimit must be a positive integer')
   })
 
   it('throws when a numeric field is a string', () => {
     const dir = tmpDir()
-    const path = writeConfig(dir, {
-      boards: [{ address: 'x.eth', archivePurgeSeconds: '100' }],
-    })
-    expect(() => loadMultiConfig(path)).toThrow('boards[0].archivePurgeSeconds must be a positive integer')
+    writeBoardConfig(dir, { address: 'x.eth', archivePurgeSeconds: '100' })
+    expect(() => loadMultiConfig(dir)).toThrow('archivePurgeSeconds must be a positive integer')
   })
 
   it('throws when defaults has invalid numeric field', () => {
     const dir = tmpDir()
-    const path = writeConfig(dir, {
-      defaults: { perPage: -5 },
-      boards: [{ address: 'x.eth' }],
-    })
-    expect(() => loadMultiConfig(path)).toThrow('defaults.perPage must be a positive integer')
+    writeGlobalConfig(dir, { defaults: { perPage: -5 } })
+    writeBoardConfig(dir, { address: 'x.eth' })
+    expect(() => loadMultiConfig(dir)).toThrow('perPage must be a positive integer')
   })
 
   it('throws when rpcUrl is not a string', () => {
     const dir = tmpDir()
-    const path = writeConfig(dir, {
-      rpcUrl: 123,
-      boards: [{ address: 'x.eth' }],
-    })
-    expect(() => loadMultiConfig(path)).toThrow('"rpcUrl" must be a string')
+    writeGlobalConfig(dir, { rpcUrl: 123 })
+    writeBoardConfig(dir, { address: 'x.eth' })
+    expect(() => loadMultiConfig(dir)).toThrow('"rpcUrl" must be a string')
   })
 
   it('throws when stateDir is not a string', () => {
     const dir = tmpDir()
-    const path = writeConfig(dir, {
-      stateDir: true,
-      boards: [{ address: 'x.eth' }],
-    })
-    expect(() => loadMultiConfig(path)).toThrow('"stateDir" must be a string')
+    writeGlobalConfig(dir, { stateDir: true })
+    writeBoardConfig(dir, { address: 'x.eth' })
+    expect(() => loadMultiConfig(dir)).toThrow('"stateDir" must be a string')
   })
 
   it('throws when defaults is not an object', () => {
     const dir = tmpDir()
-    const path = writeConfig(dir, {
-      defaults: 'bad',
-      boards: [{ address: 'x.eth' }],
-    })
-    expect(() => loadMultiConfig(path)).toThrow('"defaults" must be an object')
+    writeGlobalConfig(dir, { defaults: 'bad' })
+    writeBoardConfig(dir, { address: 'x.eth' })
+    expect(() => loadMultiConfig(dir)).toThrow('"defaults" must be an object')
   })
 
   it('loads config with moderationReasons in defaults', () => {
     const dir = tmpDir()
-    const path = writeConfig(dir, {
-      defaults: { moderationReasons: { archiveCapacity: 'custom' } },
-      boards: [{ address: 'x.eth' }],
-    })
-    const config = loadMultiConfig(path)
+    writeGlobalConfig(dir, { defaults: { moderationReasons: { archiveCapacity: 'custom' } } })
+    writeBoardConfig(dir, { address: 'x.eth' })
+    const config = loadMultiConfig(dir)
     expect(config.defaults?.moderationReasons?.archiveCapacity).toBe('custom')
   })
 
   it('loads config with moderationReasons on a board', () => {
     const dir = tmpDir()
-    const path = writeConfig(dir, {
-      boards: [{ address: 'x.eth', moderationReasons: { purgeDeleted: 'board reason' } }],
-    })
-    const config = loadMultiConfig(path)
+    writeBoardConfig(dir, { address: 'x.eth', moderationReasons: { purgeDeleted: 'board reason' } })
+    const config = loadMultiConfig(dir)
     expect(config.boards[0].moderationReasons?.purgeDeleted).toBe('board reason')
   })
 
   it('rejects non-object moderationReasons', () => {
     const dir = tmpDir()
-    const path = writeConfig(dir, {
-      boards: [{ address: 'x.eth', moderationReasons: 'bad' }],
-    })
-    expect(() => loadMultiConfig(path)).toThrow('boards[0].moderationReasons must be an object')
+    writeBoardConfig(dir, { address: 'x.eth', moderationReasons: 'bad' })
+    expect(() => loadMultiConfig(dir)).toThrow('moderationReasons must be an object')
   })
 
   it('rejects unknown keys in moderationReasons', () => {
     const dir = tmpDir()
-    const path = writeConfig(dir, {
-      boards: [{ address: 'x.eth', moderationReasons: { unknownKey: 'val' } }],
-    })
-    expect(() => loadMultiConfig(path)).toThrow('boards[0].moderationReasons has unknown key "unknownKey"')
+    writeBoardConfig(dir, { address: 'x.eth', moderationReasons: { unknownKey: 'val' } })
+    expect(() => loadMultiConfig(dir)).toThrow('moderationReasons has unknown key "unknownKey"')
   })
 
   it('rejects non-string values in moderationReasons', () => {
     const dir = tmpDir()
-    const path = writeConfig(dir, {
-      boards: [{ address: 'x.eth', moderationReasons: { archiveCapacity: 123 } }],
-    })
-    expect(() => loadMultiConfig(path)).toThrow('boards[0].moderationReasons.archiveCapacity must be a string')
+    writeBoardConfig(dir, { address: 'x.eth', moderationReasons: { archiveCapacity: 123 } })
+    expect(() => loadMultiConfig(dir)).toThrow('moderationReasons.archiveCapacity must be a string')
   })
 })
 

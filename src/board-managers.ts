@@ -1,7 +1,8 @@
 import { watch, type FSWatcher } from 'node:fs'
+import { join } from 'node:path'
 import Logger from '@plebbit/plebbit-logger'
 import { startBoardManager } from './board-manager.js'
-import { loadConfig, diffBoards } from './config-manager.js'
+import { loadConfig, globalConfigPath } from './config-manager.js'
 import { resolveBoardManagerOptions } from './multi-config.js'
 import type { BoardManagerResult, MultiBoardConfig } from './types.js'
 
@@ -14,12 +15,13 @@ export interface BoardManagers {
 }
 
 /**
- * Start board managers that watch the config file for changes.
+ * Start board managers that watch the config directory for changes.
+ * Watches both boards/ directory and global.json for hot-reload.
  * On config change, diffs the old and new config, stops removed board managers,
  * and starts added board managers.
  */
 export async function startBoardManagers(
-  configPath: string,
+  configDir: string,
   initialConfig: MultiBoardConfig,
 ): Promise<BoardManagers> {
   const boardManagers = new Map<string, BoardManagerResult>()
@@ -56,13 +58,13 @@ export async function startBoardManagers(
     try {
       let newConfig: MultiBoardConfig
       try {
-        newConfig = loadConfig(configPath)
+        newConfig = loadConfig(configDir)
       } catch (err) {
         log.error(`failed to reload config: ${(err as Error).message}`)
         return
       }
 
-      const { added, removed, changed } = diffBoards(currentConfig, newConfig)
+      const { added, removed, changed } = diffConfigsWithGlobal(currentConfig, newConfig)
 
       if (added.length === 0 && removed.length === 0 && changed.length === 0) {
         currentConfig = newConfig
@@ -135,20 +137,32 @@ export async function startBoardManagers(
     }
   }
 
-  // Watch config file for changes with debounce
+  // Watch config directory for changes with debounce
   let debounceTimer: ReturnType<typeof setTimeout> | undefined
-  let watcher: FSWatcher | undefined
+  const watchers: FSWatcher[] = []
 
+  function triggerReload(): void {
+    if (stopped) return
+    if (debounceTimer) clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(() => {
+      handleConfigChange()
+    }, 200)
+  }
+
+  // Watch boards/ directory
+  const boardsDir = join(configDir, 'boards')
   try {
-    watcher = watch(configPath, () => {
-      if (stopped) return
-      if (debounceTimer) clearTimeout(debounceTimer)
-      debounceTimer = setTimeout(() => {
-        handleConfigChange()
-      }, 200)
-    })
+    watchers.push(watch(boardsDir, triggerReload))
   } catch {
-    log(`config file does not exist yet, skipping watch`)
+    log(`boards directory does not exist yet, skipping watch`)
+  }
+
+  // Watch global.json
+  const globalPath = globalConfigPath(configDir)
+  try {
+    watchers.push(watch(globalPath, triggerReload))
+  } catch {
+    log(`global.json does not exist yet, skipping watch`)
   }
 
   return {
@@ -161,8 +175,8 @@ export async function startBoardManagers(
     async stop() {
       stopped = true
       if (debounceTimer) clearTimeout(debounceTimer)
-      if (watcher) {
-        watcher.close()
+      for (const w of watchers) {
+        w.close()
       }
       const results = await Promise.allSettled(
         [...boardManagers.entries()].map(async ([address, manager]) => {
@@ -180,4 +194,56 @@ export async function startBoardManagers(
       }
     },
   }
+}
+
+/**
+ * Diff two configs, treating global config changes (rpcUrl, stateDir, defaults)
+ * as triggering all existing boards to be "changed" (restart needed).
+ */
+function diffConfigsWithGlobal(
+  oldConfig: MultiBoardConfig,
+  newConfig: MultiBoardConfig,
+): { added: MultiBoardConfig['boards']; removed: string[]; changed: MultiBoardConfig['boards'] } {
+  const oldAddresses = new Set(oldConfig.boards.map((b) => b.address))
+  const newAddresses = new Set(newConfig.boards.map((b) => b.address))
+  const oldByAddress = new Map(oldConfig.boards.map((b) => [b.address, b]))
+
+  const added = newConfig.boards.filter((b) => !oldAddresses.has(b.address))
+  const removed = oldConfig.boards
+    .filter((b) => !newAddresses.has(b.address))
+    .map((b) => b.address)
+
+  // Check if global settings changed
+  const globalChanged =
+    oldConfig.rpcUrl !== newConfig.rpcUrl ||
+    oldConfig.stateDir !== newConfig.stateDir ||
+    JSON.stringify(oldConfig.defaults) !== JSON.stringify(newConfig.defaults)
+
+  const changed: MultiBoardConfig['boards'] = []
+  for (const newBoard of newConfig.boards) {
+    const oldBoard = oldByAddress.get(newBoard.address)
+    if (!oldBoard) continue // added, not changed
+
+    if (globalChanged) {
+      // Global config changed — restart all existing boards
+      changed.push(newBoard)
+    } else if (boardConfigChanged(oldBoard, newBoard)) {
+      changed.push(newBoard)
+    }
+  }
+
+  return { added, removed, changed }
+}
+
+function boardConfigChanged(a: MultiBoardConfig['boards'][number], b: MultiBoardConfig['boards'][number]): boolean {
+  return (
+    a.perPage !== b.perPage ||
+    a.pages !== b.pages ||
+    a.bumpLimit !== b.bumpLimit ||
+    a.archivePurgeSeconds !== b.archivePurgeSeconds ||
+    a.moderationReasons?.archiveCapacity !== b.moderationReasons?.archiveCapacity ||
+    a.moderationReasons?.archiveBumpLimit !== b.moderationReasons?.archiveBumpLimit ||
+    a.moderationReasons?.purgeArchived !== b.moderationReasons?.purgeArchived ||
+    a.moderationReasons?.purgeDeleted !== b.moderationReasons?.purgeDeleted
+  )
 }

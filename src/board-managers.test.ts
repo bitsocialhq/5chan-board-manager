@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { startBoardManagers } from './board-managers.js'
@@ -19,6 +19,17 @@ function makeStopFn(): BoardManagerResult['stop'] {
 
 function makeTmpDir(): string {
   return mkdtempSync(join(tmpdir(), 'board-managers-test-'))
+}
+
+function writeGlobalConfig(dir: string, config: unknown): void {
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'global.json'), JSON.stringify(config))
+}
+
+function writeBoardConfig(dir: string, board: { address: string;[key: string]: unknown }): void {
+  const boardsDir = join(dir, 'boards')
+  mkdirSync(boardsDir, { recursive: true })
+  writeFileSync(join(boardsDir, `${board.address}.json`), JSON.stringify(board))
 }
 
 describe('startBoardManagers', () => {
@@ -49,13 +60,13 @@ describe('startBoardManagers', () => {
       .mockResolvedValueOnce({ stop: stopB })
 
     const dir = tmpDir()
-    const configPath = join(dir, 'config.json')
+    writeBoardConfig(dir, { address: 'a.eth' })
+    writeBoardConfig(dir, { address: 'b.eth' })
     const config: MultiBoardConfig = {
       boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
     }
-    writeFileSync(configPath, JSON.stringify(config))
 
-    const manager = await startBoardManagers(configPath, config)
+    const manager = await startBoardManagers(dir, config)
 
     expect(manager.boardManagers.size).toBe(2)
     expect(manager.boardManagers.has('a.eth')).toBe(true)
@@ -71,13 +82,13 @@ describe('startBoardManagers', () => {
       .mockResolvedValueOnce({ stop: makeStopFn() })
 
     const dir = tmpDir()
-    const configPath = join(dir, 'config.json')
+    writeBoardConfig(dir, { address: 'a.eth' })
+    writeBoardConfig(dir, { address: 'b.eth' })
     const config: MultiBoardConfig = {
       boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
     }
-    writeFileSync(configPath, JSON.stringify(config))
 
-    const manager = await startBoardManagers(configPath, config)
+    const manager = await startBoardManagers(dir, config)
 
     expect(manager.boardManagers.size).toBe(1)
     expect(manager.boardManagers.has('b.eth')).toBe(true)
@@ -93,24 +104,23 @@ describe('startBoardManagers', () => {
       .mockRejectedValueOnce(new Error('timeout'))
 
     const dir = tmpDir()
-    const configPath = join(dir, 'config.json')
+    writeBoardConfig(dir, { address: 'a.eth' })
+    writeBoardConfig(dir, { address: 'b.eth' })
     const config: MultiBoardConfig = {
       boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
     }
-    writeFileSync(configPath, JSON.stringify(config))
 
-    await expect(startBoardManagers(configPath, config)).rejects.toThrow(
+    await expect(startBoardManagers(dir, config)).rejects.toThrow(
       'All 2 board(s) failed to start',
     )
   })
 
   it('starts with empty config', async () => {
     const dir = tmpDir()
-    const configPath = join(dir, 'config.json')
+    mkdirSync(join(dir, 'boards'), { recursive: true })
     const config: MultiBoardConfig = { boards: [] }
-    writeFileSync(configPath, JSON.stringify(config))
 
-    const manager = await startBoardManagers(configPath, config)
+    const manager = await startBoardManagers(dir, config)
 
     expect(manager.boardManagers.size).toBe(0)
     expect(manager.errors.size).toBe(0)
@@ -122,16 +132,15 @@ describe('startBoardManagers', () => {
     mockStartBoardManager.mockResolvedValue({ stop: makeStopFn() })
 
     const dir = tmpDir()
-    const configPath = join(dir, 'config.json')
+    writeBoardConfig(dir, { address: 'x.eth', bumpLimit: 500 })
     const config: MultiBoardConfig = {
       rpcUrl: 'ws://test:9138',
       stateDir: '/test/state',
       defaults: { perPage: 20 },
       boards: [{ address: 'x.eth', bumpLimit: 500 }],
     }
-    writeFileSync(configPath, JSON.stringify(config))
 
-    const manager = await startBoardManagers(configPath, config)
+    const manager = await startBoardManagers(dir, config)
 
     const opts = mockStartBoardManager.mock.calls[0][0] as BoardManagerOptions
     expect(opts.subplebbitAddress).toBe('x.eth')
@@ -152,20 +161,16 @@ describe('startBoardManagers', () => {
         .mockResolvedValueOnce({ stop: stopNew })
 
       const dir = tmpDir()
-      const configPath = join(dir, 'config.json')
+      writeBoardConfig(dir, { address: 'a.eth' })
       const config: MultiBoardConfig = {
         boards: [{ address: 'a.eth' }],
       }
-      writeFileSync(configPath, JSON.stringify(config))
 
-      const manager = await startBoardManagers(configPath, config)
+      const manager = await startBoardManagers(dir, config)
       expect(manager.boardManagers.size).toBe(1)
 
-      // Write updated config with new board
-      const newConfig: MultiBoardConfig = {
-        boards: [{ address: 'a.eth' }, { address: 'new.eth' }],
-      }
-      writeFileSync(configPath, JSON.stringify(newConfig))
+      // Add new board config file
+      writeBoardConfig(dir, { address: 'new.eth' })
 
       // Wait for debounce + async handling
       await new Promise((r) => setTimeout(r, 500))
@@ -184,20 +189,16 @@ describe('startBoardManagers', () => {
         .mockResolvedValueOnce({ stop: stopNew })
 
       const dir = tmpDir()
-      const configPath = join(dir, 'config.json')
+      writeBoardConfig(dir, { address: 'a.eth', bumpLimit: 300 })
       const config: MultiBoardConfig = {
         boards: [{ address: 'a.eth', bumpLimit: 300 }],
       }
-      writeFileSync(configPath, JSON.stringify(config))
 
-      const manager = await startBoardManagers(configPath, config)
+      const manager = await startBoardManagers(dir, config)
       expect(manager.boardManagers.size).toBe(1)
 
-      // Write updated config with changed bumpLimit
-      const newConfig: MultiBoardConfig = {
-        boards: [{ address: 'a.eth', bumpLimit: 500 }],
-      }
-      writeFileSync(configPath, JSON.stringify(newConfig))
+      // Update board config file with changed bumpLimit
+      writeBoardConfig(dir, { address: 'a.eth', bumpLimit: 500 })
 
       // Wait for debounce + async handling
       await new Promise((r) => setTimeout(r, 500))
@@ -217,20 +218,16 @@ describe('startBoardManagers', () => {
         .mockRejectedValueOnce(new Error('restart failed'))
 
       const dir = tmpDir()
-      const configPath = join(dir, 'config.json')
+      writeBoardConfig(dir, { address: 'a.eth', bumpLimit: 300 })
       const config: MultiBoardConfig = {
         boards: [{ address: 'a.eth', bumpLimit: 300 }],
       }
-      writeFileSync(configPath, JSON.stringify(config))
 
-      const manager = await startBoardManagers(configPath, config)
+      const manager = await startBoardManagers(dir, config)
       expect(manager.boardManagers.size).toBe(1)
 
-      // Write updated config with changed bumpLimit
-      const newConfig: MultiBoardConfig = {
-        boards: [{ address: 'a.eth', bumpLimit: 500 }],
-      }
-      writeFileSync(configPath, JSON.stringify(newConfig))
+      // Update board config file with changed bumpLimit
+      writeBoardConfig(dir, { address: 'a.eth', bumpLimit: 500 })
 
       // Wait for debounce + async handling
       await new Promise((r) => setTimeout(r, 500))
@@ -251,20 +248,17 @@ describe('startBoardManagers', () => {
         .mockResolvedValueOnce({ stop: stopB })
 
       const dir = tmpDir()
-      const configPath = join(dir, 'config.json')
+      writeBoardConfig(dir, { address: 'a.eth' })
+      writeBoardConfig(dir, { address: 'b.eth' })
       const config: MultiBoardConfig = {
         boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
       }
-      writeFileSync(configPath, JSON.stringify(config))
 
-      const manager = await startBoardManagers(configPath, config)
+      const manager = await startBoardManagers(dir, config)
       expect(manager.boardManagers.size).toBe(2)
 
-      // Write updated config with removed board
-      const newConfig: MultiBoardConfig = {
-        boards: [{ address: 'a.eth' }],
-      }
-      writeFileSync(configPath, JSON.stringify(newConfig))
+      // Remove board config file
+      unlinkSync(join(dir, 'boards', 'b.eth.json'))
 
       // Wait for debounce + async handling
       await new Promise((r) => setTimeout(r, 500))
@@ -287,13 +281,13 @@ describe('startBoardManagers', () => {
         .mockResolvedValueOnce({ stop: stopB })
 
       const dir = tmpDir()
-      const configPath = join(dir, 'config.json')
+      writeBoardConfig(dir, { address: 'a.eth' })
+      writeBoardConfig(dir, { address: 'b.eth' })
       const config: MultiBoardConfig = {
         boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
       }
-      writeFileSync(configPath, JSON.stringify(config))
 
-      const manager = await startBoardManagers(configPath, config)
+      const manager = await startBoardManagers(dir, config)
       await manager.stop()
 
       expect(stopA).toHaveBeenCalledOnce()
@@ -308,13 +302,13 @@ describe('startBoardManagers', () => {
         .mockResolvedValueOnce({ stop: stopB })
 
       const dir = tmpDir()
-      const configPath = join(dir, 'config.json')
+      writeBoardConfig(dir, { address: 'a.eth' })
+      writeBoardConfig(dir, { address: 'b.eth' })
       const config: MultiBoardConfig = {
         boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
       }
-      writeFileSync(configPath, JSON.stringify(config))
 
-      const manager = await startBoardManagers(configPath, config)
+      const manager = await startBoardManagers(dir, config)
       // Should not throw even though stopA fails
       await manager.stop()
 

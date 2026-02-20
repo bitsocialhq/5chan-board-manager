@@ -1,6 +1,5 @@
 import { Args, Command, Flags } from '@oclif/core'
-import { join } from 'node:path'
-import { loadConfig, saveConfig, updateBoard } from '../../config-manager.js'
+import { loadBoardConfig, boardConfigPath, saveBoardConfig, updateBoardConfig } from '../../config-manager.js'
 import type { BoardConfig } from '../../types.js'
 
 /** Maps kebab-case CLI flag names to camelCase BoardConfig field names */
@@ -50,7 +49,7 @@ export default class BoardEdit extends Command {
 
   async run(): Promise<void> {
     const { args, flags } = await this.parse(BoardEdit)
-    const configPath = join(this.config.configDir, 'config.json')
+    const configDir = this.config.configDir
 
     const updates: Partial<Omit<BoardConfig, 'address'>> = {}
     if (flags['per-page'] !== undefined) updates.perPage = flags['per-page']
@@ -75,10 +74,17 @@ export default class BoardEdit extends Command {
       this.error('At least one flag (--per-page, --pages, --bump-limit, --archive-purge-seconds) or --reset must be provided')
     }
 
-    const config = loadConfig(configPath)
-    const updated = updateBoard(config, args.address, updates, resetFields)
-    saveConfig(configPath, updated)
+    const filePath = boardConfigPath(configDir, args.address)
+    let board: BoardConfig
+    try {
+      board = loadBoardConfig(filePath)
+    } catch {
+      this.error(`Board "${args.address}" not found in config`)
+    }
 
-    this.log(`Updated board "${args.address}" in ${configPath}`)
+    const updated = updateBoardConfig(board, updates, resetFields)
+    saveBoardConfig(configDir, updated)
+
+    this.log(`Updated board "${args.address}" in ${configDir}`)
   }
 }

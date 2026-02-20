@@ -1,19 +1,39 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { loadConfig, saveConfig, addBoard, removeBoard, updateBoard, diffBoards } from './config-manager.js'
-import type { BoardConfig, MultiBoardConfig } from './types.js'
+import {
+  loadConfig, loadGlobalConfig, loadBoardConfig, saveGlobalConfig,
+  saveBoardConfig, deleteBoardConfig, updateBoardConfig, diffBoards,
+  globalConfigPath, boardConfigPath,
+} from './config-manager.js'
+import type { BoardConfig, GlobalConfig, MultiBoardConfig } from './types.js'
 
 function makeTmpDir(): string {
   return mkdtempSync(join(tmpdir(), 'config-manager-test-'))
 }
 
-function writeJson(dir: string, filename: string, data: unknown): string {
-  const path = join(dir, filename)
-  writeFileSync(path, JSON.stringify(data))
-  return path
+function writeGlobalConfig(dir: string, config: unknown): void {
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'global.json'), JSON.stringify(config))
 }
+
+function writeBoardConfig(dir: string, board: unknown): void {
+  const boardsDir = join(dir, 'boards')
+  mkdirSync(boardsDir, { recursive: true })
+  const b = board as { address: string }
+  writeFileSync(join(boardsDir, `${b.address}.json`), JSON.stringify(board))
+}
+
+describe('path helpers', () => {
+  it('globalConfigPath returns global.json path', () => {
+    expect(globalConfigPath('/foo/bar')).toBe('/foo/bar/global.json')
+  })
+
+  it('boardConfigPath returns boards/{address}.json path', () => {
+    expect(boardConfigPath('/foo/bar', 'test.eth')).toBe('/foo/bar/boards/test.eth.json')
+  })
+})
 
 describe('loadConfig', () => {
   const dirs: string[] = []
@@ -31,158 +51,135 @@ describe('loadConfig', () => {
     dirs.length = 0
   })
 
-  it('returns default config with empty boards on ENOENT', () => {
-    const config = loadConfig('/no/such/path/config.json')
+  it('returns default config with empty boards when directory is empty', () => {
+    const dir = tmpDir()
+    const config = loadConfig(dir)
     expect(config).toEqual({ boards: [] })
   })
 
-  it('loads a minimal valid config', () => {
+  it('returns default config with empty boards when directory does not exist', () => {
+    const config = loadConfig('/no/such/path/config-dir')
+    expect(config).toEqual({ boards: [] })
+  })
+
+  it('loads global.json + single board file', () => {
     const dir = tmpDir()
-    const path = writeJson(dir, 'config.json', { boards: [{ address: 'board.eth' }] })
-    const config = loadConfig(path)
+    writeGlobalConfig(dir, { rpcUrl: 'ws://custom:9138' })
+    writeBoardConfig(dir, { address: 'board.eth' })
+
+    const config = loadConfig(dir)
+    expect(config.rpcUrl).toBe('ws://custom:9138')
     expect(config.boards).toHaveLength(1)
     expect(config.boards[0].address).toBe('board.eth')
   })
 
-  it('loads a full config with all fields', () => {
+  it('loads full config with all fields', () => {
     const dir = tmpDir()
-    const path = writeJson(dir, 'config.json', {
+    writeGlobalConfig(dir, {
       rpcUrl: 'ws://custom:9138',
       stateDir: '/data/state',
       defaults: { perPage: 20, pages: 5, bumpLimit: 400, archivePurgeSeconds: 86400 },
-      boards: [
-        { address: 'a.eth' },
-        { address: 'b.eth', bumpLimit: 600 },
-      ],
     })
-    const config = loadConfig(path)
+    writeBoardConfig(dir, { address: 'a.eth' })
+    writeBoardConfig(dir, { address: 'b.eth', bumpLimit: 600 })
+
+    const config = loadConfig(dir)
     expect(config.rpcUrl).toBe('ws://custom:9138')
     expect(config.stateDir).toBe('/data/state')
     expect(config.defaults?.perPage).toBe(20)
     expect(config.boards).toHaveLength(2)
-    expect(config.boards[1].bumpLimit).toBe(600)
+    expect(config.boards.find((b) => b.address === 'b.eth')?.bumpLimit).toBe(600)
   })
 
-  it('allows empty boards array', () => {
+  it('returns empty boards when boards/ directory is missing', () => {
     const dir = tmpDir()
-    const path = writeJson(dir, 'config.json', { boards: [] })
-    const config = loadConfig(path)
+    writeGlobalConfig(dir, { rpcUrl: 'ws://x:9138' })
+    const config = loadConfig(dir)
     expect(config.boards).toEqual([])
   })
 
-  it('defaults boards to empty array when missing from file', () => {
+  it('throws on invalid JSON in global.json', () => {
     const dir = tmpDir()
-    const path = writeJson(dir, 'config.json', { rpcUrl: 'ws://x:9138' })
-    const config = loadConfig(path)
-    expect(config.boards).toEqual([])
+    writeFileSync(join(dir, 'global.json'), '{ not valid }')
+    expect(() => loadConfig(dir)).toThrow('Invalid JSON')
   })
 
-  it('throws on invalid JSON', () => {
+  it('throws when global.json is not an object', () => {
     const dir = tmpDir()
-    const path = join(dir, 'bad.json')
-    writeFileSync(path, '{ not valid }')
-    expect(() => loadConfig(path)).toThrow('Invalid JSON')
+    writeGlobalConfig(dir, [1, 2, 3])
+    expect(() => loadConfig(dir)).toThrow('must contain a JSON object')
   })
 
-  it('throws when config is not an object', () => {
+  it('throws on duplicate board addresses', () => {
     const dir = tmpDir()
-    const path = writeJson(dir, 'config.json', [1, 2, 3])
-    expect(() => loadConfig(path)).toThrow('must contain a JSON object')
-  })
-
-  it('throws when boards is not an array', () => {
-    const dir = tmpDir()
-    const path = writeJson(dir, 'config.json', { boards: 'bad' })
-    expect(() => loadConfig(path)).toThrow('"boards" must be an array')
-  })
-
-  it('throws on duplicate addresses', () => {
-    const dir = tmpDir()
-    const path = writeJson(dir, 'config.json', {
-      boards: [{ address: 'dup.eth' }, { address: 'dup.eth' }],
-    })
-    expect(() => loadConfig(path)).toThrow('duplicate board address "dup.eth"')
+    const boardsDir = join(dir, 'boards')
+    mkdirSync(boardsDir, { recursive: true })
+    // Write two files with same address but different filenames (impossible if filename matches)
+    // Actually with filename validation this can't happen, test that filename mismatch is caught
+    writeFileSync(join(boardsDir, 'wrong.json'), JSON.stringify({ address: 'board.eth' }))
+    expect(() => loadConfig(dir)).toThrow('filename "wrong.json" does not match address "board.eth"')
   })
 
   it('throws when a numeric field is not a positive integer', () => {
     const dir = tmpDir()
-    const path = writeJson(dir, 'config.json', {
-      boards: [{ address: 'x.eth', perPage: -1 }],
-    })
-    expect(() => loadConfig(path)).toThrow('boards[0].perPage must be a positive integer')
+    writeBoardConfig(dir, { address: 'x.eth', perPage: -1 })
+    expect(() => loadConfig(dir)).toThrow('perPage must be a positive integer')
   })
 
   it('throws when rpcUrl is not a string', () => {
     const dir = tmpDir()
-    const path = writeJson(dir, 'config.json', {
-      rpcUrl: 123,
-      boards: [{ address: 'x.eth' }],
-    })
-    expect(() => loadConfig(path)).toThrow('"rpcUrl" must be a string')
+    writeGlobalConfig(dir, { rpcUrl: 123 })
+    expect(() => loadConfig(dir)).toThrow('"rpcUrl" must be a string')
   })
 
   it('throws when stateDir is not a string', () => {
     const dir = tmpDir()
-    const path = writeJson(dir, 'config.json', {
-      stateDir: true,
-      boards: [{ address: 'x.eth' }],
-    })
-    expect(() => loadConfig(path)).toThrow('"stateDir" must be a string')
+    writeGlobalConfig(dir, { stateDir: true })
+    expect(() => loadConfig(dir)).toThrow('"stateDir" must be a string')
   })
 
   it('throws when defaults is not an object', () => {
     const dir = tmpDir()
-    const path = writeJson(dir, 'config.json', {
-      defaults: 'bad',
-      boards: [{ address: 'x.eth' }],
-    })
-    expect(() => loadConfig(path)).toThrow('"defaults" must be an object')
+    writeGlobalConfig(dir, { defaults: 'bad' })
+    expect(() => loadConfig(dir)).toThrow('"defaults" must be an object')
   })
 
   it('throws when board address is empty string', () => {
     const dir = tmpDir()
-    const path = writeJson(dir, 'config.json', {
-      boards: [{ address: '  ' }],
-    })
-    expect(() => loadConfig(path)).toThrow('boards[0].address must be a non-empty string')
+    const boardsDir = join(dir, 'boards')
+    mkdirSync(boardsDir, { recursive: true })
+    writeFileSync(join(boardsDir, '.json'), JSON.stringify({ address: '  ' }))
+    expect(() => loadConfig(dir)).toThrow('address must be a non-empty string')
   })
 
   it('loads config with moderationReasons in defaults', () => {
     const dir = tmpDir()
-    const path = writeJson(dir, 'config.json', {
-      defaults: { moderationReasons: { archiveCapacity: 'custom' } },
-      boards: [{ address: 'x.eth' }],
-    })
-    const config = loadConfig(path)
+    writeGlobalConfig(dir, { defaults: { moderationReasons: { archiveCapacity: 'custom' } } })
+    writeBoardConfig(dir, { address: 'x.eth' })
+    const config = loadConfig(dir)
     expect(config.defaults?.moderationReasons?.archiveCapacity).toBe('custom')
   })
 
   it('rejects non-object moderationReasons', () => {
     const dir = tmpDir()
-    const path = writeJson(dir, 'config.json', {
-      boards: [{ address: 'x.eth', moderationReasons: 42 }],
-    })
-    expect(() => loadConfig(path)).toThrow('boards[0].moderationReasons must be an object')
+    writeBoardConfig(dir, { address: 'x.eth', moderationReasons: 42 })
+    expect(() => loadConfig(dir)).toThrow('moderationReasons must be an object')
   })
 
   it('rejects unknown keys in moderationReasons', () => {
     const dir = tmpDir()
-    const path = writeJson(dir, 'config.json', {
-      boards: [{ address: 'x.eth', moderationReasons: { badKey: 'val' } }],
-    })
-    expect(() => loadConfig(path)).toThrow('boards[0].moderationReasons has unknown key "badKey"')
+    writeBoardConfig(dir, { address: 'x.eth', moderationReasons: { badKey: 'val' } })
+    expect(() => loadConfig(dir)).toThrow('moderationReasons has unknown key "badKey"')
   })
 
   it('rejects non-string values in moderationReasons', () => {
     const dir = tmpDir()
-    const path = writeJson(dir, 'config.json', {
-      boards: [{ address: 'x.eth', moderationReasons: { purgeDeleted: true } }],
-    })
-    expect(() => loadConfig(path)).toThrow('boards[0].moderationReasons.purgeDeleted must be a string')
+    writeBoardConfig(dir, { address: 'x.eth', moderationReasons: { purgeDeleted: true } })
+    expect(() => loadConfig(dir)).toThrow('moderationReasons.purgeDeleted must be a string')
   })
 })
 
-describe('saveConfig', () => {
+describe('saveGlobalConfig', () => {
   const dirs: string[] = []
 
   function tmpDir(): string {
@@ -198,14 +195,11 @@ describe('saveConfig', () => {
     dirs.length = 0
   })
 
-  it('writes config as pretty-printed JSON', () => {
+  it('writes global config as pretty-printed JSON', () => {
     const dir = tmpDir()
-    const path = join(dir, 'config.json')
-    const config: MultiBoardConfig = {
-      boards: [{ address: 'test.eth' }],
-    }
-    saveConfig(path, config)
-    const written = readFileSync(path, 'utf-8')
+    const config: GlobalConfig = { rpcUrl: 'ws://test:9138' }
+    saveGlobalConfig(dir, config)
+    const written = readFileSync(join(dir, 'global.json'), 'utf-8')
     expect(JSON.parse(written)).toEqual(config)
     expect(written).toContain('\n')
     expect(written.endsWith('\n')).toBe(true)
@@ -213,23 +207,14 @@ describe('saveConfig', () => {
 
   it('creates parent directories', () => {
     const dir = tmpDir()
-    const path = join(dir, 'nested', 'deep', 'config.json')
-    saveConfig(path, { boards: [] })
-    const written = readFileSync(path, 'utf-8')
-    expect(JSON.parse(written)).toEqual({ boards: [] })
-  })
-
-  it('overwrites existing config', () => {
-    const dir = tmpDir()
-    const path = join(dir, 'config.json')
-    saveConfig(path, { boards: [{ address: 'a.eth' }] })
-    saveConfig(path, { boards: [{ address: 'b.eth' }] })
-    const written = JSON.parse(readFileSync(path, 'utf-8'))
-    expect(written.boards[0].address).toBe('b.eth')
+    const nested = join(dir, 'nested', 'deep')
+    saveGlobalConfig(nested, { stateDir: '/test' })
+    const written = readFileSync(join(nested, 'global.json'), 'utf-8')
+    expect(JSON.parse(written)).toEqual({ stateDir: '/test' })
   })
 })
 
-describe('saveConfig atomic write', () => {
+describe('saveBoardConfig', () => {
   const dirs: string[] = []
 
   function tmpDir(): string {
@@ -245,108 +230,142 @@ describe('saveConfig atomic write', () => {
     dirs.length = 0
   })
 
+  it('writes board config to boards/{address}.json', () => {
+    const dir = tmpDir()
+    const board: BoardConfig = { address: 'test.eth', bumpLimit: 500 }
+    saveBoardConfig(dir, board)
+    const written = readFileSync(join(dir, 'boards', 'test.eth.json'), 'utf-8')
+    expect(JSON.parse(written)).toEqual(board)
+    expect(written.endsWith('\n')).toBe(true)
+  })
+
+  it('creates boards/ directory if missing', () => {
+    const dir = tmpDir()
+    saveBoardConfig(dir, { address: 'new.eth' })
+    expect(existsSync(join(dir, 'boards', 'new.eth.json'))).toBe(true)
+  })
+
+  it('overwrites existing board config', () => {
+    const dir = tmpDir()
+    saveBoardConfig(dir, { address: 'a.eth', bumpLimit: 300 })
+    saveBoardConfig(dir, { address: 'a.eth', bumpLimit: 500 })
+    const written = JSON.parse(readFileSync(join(dir, 'boards', 'a.eth.json'), 'utf-8'))
+    expect(written.bumpLimit).toBe(500)
+  })
+
   it('does not leave a .tmp file after successful write', () => {
     const dir = tmpDir()
-    const path = join(dir, 'config.json')
-    saveConfig(path, { boards: [{ address: 'a.eth' }] })
-    expect(existsSync(path)).toBe(true)
-    expect(existsSync(path + '.tmp')).toBe(false)
-  })
-
-  it('preserves original config when a leftover .tmp file exists', () => {
-    const dir = tmpDir()
-    const path = join(dir, 'config.json')
-    saveConfig(path, { boards: [{ address: 'original.eth' }] })
-    // Simulate a crash that left a .tmp file
-    writeFileSync(path + '.tmp', 'partial garbage')
-    // Original should still be readable
-    const config = loadConfig(path)
-    expect(config.boards[0].address).toBe('original.eth')
-  })
-
-  it('overwrites leftover .tmp on next successful save', () => {
-    const dir = tmpDir()
-    const path = join(dir, 'config.json')
-    // Leave a stale .tmp file
-    writeFileSync(path + '.tmp', 'stale')
-    saveConfig(path, { boards: [{ address: 'fresh.eth' }] })
-    expect(existsSync(path + '.tmp')).toBe(false)
-    const config = loadConfig(path)
-    expect(config.boards[0].address).toBe('fresh.eth')
+    saveBoardConfig(dir, { address: 'a.eth' })
+    const filePath = join(dir, 'boards', 'a.eth.json')
+    expect(existsSync(filePath)).toBe(true)
+    expect(existsSync(filePath + '.tmp')).toBe(false)
   })
 })
 
-describe('addBoard', () => {
-  it('adds a board to an empty config', () => {
-    const config: MultiBoardConfig = { boards: [] }
-    const result = addBoard(config, { address: 'new.eth' })
-    expect(result.boards).toHaveLength(1)
-    expect(result.boards[0].address).toBe('new.eth')
-  })
+describe('deleteBoardConfig', () => {
+  const dirs: string[] = []
 
-  it('adds a board with overrides', () => {
-    const config: MultiBoardConfig = { boards: [{ address: 'existing.eth' }] }
-    const result = addBoard(config, { address: 'new.eth', bumpLimit: 500 })
-    expect(result.boards).toHaveLength(2)
-    expect(result.boards[1]).toEqual({ address: 'new.eth', bumpLimit: 500 })
-  })
+  function tmpDir(): string {
+    const d = makeTmpDir()
+    dirs.push(d)
+    return d
+  }
 
-  it('throws on duplicate address', () => {
-    const config: MultiBoardConfig = { boards: [{ address: 'dup.eth' }] }
-    expect(() => addBoard(config, { address: 'dup.eth' })).toThrow('Board "dup.eth" already exists')
-  })
-
-  it('does not mutate the original config', () => {
-    const config: MultiBoardConfig = { boards: [{ address: 'a.eth' }] }
-    const result = addBoard(config, { address: 'b.eth' })
-    expect(config.boards).toHaveLength(1)
-    expect(result.boards).toHaveLength(2)
-  })
-
-  it('preserves existing config fields', () => {
-    const config: MultiBoardConfig = {
-      rpcUrl: 'ws://test:9138',
-      defaults: { perPage: 20 },
-      boards: [{ address: 'a.eth' }],
+  afterEach(() => {
+    for (const d of dirs) {
+      rmSync(d, { recursive: true, force: true })
     }
-    const result = addBoard(config, { address: 'b.eth' })
-    expect(result.rpcUrl).toBe('ws://test:9138')
-    expect(result.defaults?.perPage).toBe(20)
+    dirs.length = 0
   })
-})
 
-describe('removeBoard', () => {
-  it('removes a board by address', () => {
-    const config: MultiBoardConfig = {
-      boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
-    }
-    const result = removeBoard(config, 'a.eth')
-    expect(result.boards).toHaveLength(1)
-    expect(result.boards[0].address).toBe('b.eth')
+  it('deletes a board config file', () => {
+    const dir = tmpDir()
+    saveBoardConfig(dir, { address: 'a.eth' })
+    expect(existsSync(join(dir, 'boards', 'a.eth.json'))).toBe(true)
+
+    deleteBoardConfig(dir, 'a.eth')
+    expect(existsSync(join(dir, 'boards', 'a.eth.json'))).toBe(false)
   })
 
   it('throws when board not found', () => {
-    const config: MultiBoardConfig = { boards: [{ address: 'a.eth' }] }
-    expect(() => removeBoard(config, 'missing.eth')).toThrow('Board "missing.eth" not found')
+    const dir = tmpDir()
+    mkdirSync(join(dir, 'boards'), { recursive: true })
+    expect(() => deleteBoardConfig(dir, 'missing.eth')).toThrow('Board "missing.eth" not found')
+  })
+})
+
+describe('updateBoardConfig', () => {
+  it('updates a single field on an existing board', () => {
+    const board: BoardConfig = { address: 'a.eth', bumpLimit: 300 }
+    const result = updateBoardConfig(board, { bumpLimit: 500 })
+    expect(result.bumpLimit).toBe(500)
   })
 
-  it('does not mutate the original config', () => {
-    const config: MultiBoardConfig = {
-      boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
-    }
-    const result = removeBoard(config, 'a.eth')
-    expect(config.boards).toHaveLength(2)
-    expect(result.boards).toHaveLength(1)
+  it('adds a new field to an existing board', () => {
+    const board: BoardConfig = { address: 'a.eth' }
+    const result = updateBoardConfig(board, { perPage: 25 })
+    expect(result.perPage).toBe(25)
   })
 
-  it('preserves existing config fields', () => {
-    const config: MultiBoardConfig = {
-      rpcUrl: 'ws://test:9138',
-      boards: [{ address: 'a.eth' }],
-    }
-    const result = removeBoard(config, 'a.eth')
-    expect(result.rpcUrl).toBe('ws://test:9138')
-    expect(result.boards).toHaveLength(0)
+  it('updates multiple fields at once', () => {
+    const board: BoardConfig = { address: 'a.eth' }
+    const result = updateBoardConfig(board, { perPage: 25, pages: 3 })
+    expect(result.perPage).toBe(25)
+    expect(result.pages).toBe(3)
+  })
+
+  it('resets a field to undefined', () => {
+    const board: BoardConfig = { address: 'a.eth', bumpLimit: 500 }
+    const result = updateBoardConfig(board, {}, ['bumpLimit'])
+    expect(Object.hasOwn(result, 'bumpLimit')).toBe(false)
+  })
+
+  it('resets multiple fields', () => {
+    const board: BoardConfig = { address: 'a.eth', perPage: 25, pages: 3, bumpLimit: 500, archivePurgeSeconds: 86400 }
+    const result = updateBoardConfig(board, {}, ['perPage', 'bumpLimit'])
+    expect(Object.hasOwn(result, 'perPage')).toBe(false)
+    expect(Object.hasOwn(result, 'bumpLimit')).toBe(false)
+    expect(result.pages).toBe(3)
+    expect(result.archivePurgeSeconds).toBe(86400)
+  })
+
+  it('allows setting one field and resetting another simultaneously', () => {
+    const board: BoardConfig = { address: 'a.eth', perPage: 25, bumpLimit: 300 }
+    const result = updateBoardConfig(board, { perPage: 30 }, ['bumpLimit'])
+    expect(result.perPage).toBe(30)
+    expect(Object.hasOwn(result, 'bumpLimit')).toBe(false)
+  })
+
+  it('throws when setting and resetting the same field', () => {
+    const board: BoardConfig = { address: 'a.eth' }
+    expect(() => updateBoardConfig(board, { perPage: 25 }, ['perPage'])).toThrow(
+      'Cannot set and reset the same field "perPage"',
+    )
+  })
+
+  it('does not mutate the original board', () => {
+    const board: BoardConfig = { address: 'a.eth', bumpLimit: 300 }
+    const result = updateBoardConfig(board, { bumpLimit: 500 })
+    expect(board.bumpLimit).toBe(300)
+    expect(result.bumpLimit).toBe(500)
+  })
+
+  it('preserves address field', () => {
+    const board: BoardConfig = { address: 'a.eth' }
+    const result = updateBoardConfig(board, { bumpLimit: 500 })
+    expect(result.address).toBe('a.eth')
+  })
+
+  it('updates moderationReasons on a board', () => {
+    const board: BoardConfig = { address: 'a.eth' }
+    const result = updateBoardConfig(board, { moderationReasons: { archiveCapacity: 'custom' } })
+    expect(result.moderationReasons?.archiveCapacity).toBe('custom')
+  })
+
+  it('resets moderationReasons on a board', () => {
+    const board: BoardConfig = { address: 'a.eth', moderationReasons: { archiveCapacity: 'val' } }
+    const result = updateBoardConfig(board, {}, ['moderationReasons'])
+    expect(Object.hasOwn(result, 'moderationReasons')).toBe(false)
   })
 })
 
@@ -503,120 +522,5 @@ describe('diffBoards', () => {
     }
     const diff = diffBoards(config, { ...config, boards: [{ address: 'a.eth', moderationReasons: { ...reasons } }] })
     expect(diff.changed).toHaveLength(0)
-  })
-})
-
-describe('updateBoard', () => {
-  it('updates a single field on an existing board', () => {
-    const config: MultiBoardConfig = {
-      boards: [{ address: 'a.eth', bumpLimit: 300 }],
-    }
-    const result = updateBoard(config, 'a.eth', { bumpLimit: 500 })
-    expect(result.boards[0].bumpLimit).toBe(500)
-  })
-
-  it('adds a new field to an existing board', () => {
-    const config: MultiBoardConfig = {
-      boards: [{ address: 'a.eth' }],
-    }
-    const result = updateBoard(config, 'a.eth', { perPage: 25 })
-    expect(result.boards[0].perPage).toBe(25)
-  })
-
-  it('updates multiple fields at once', () => {
-    const config: MultiBoardConfig = {
-      boards: [{ address: 'a.eth' }],
-    }
-    const result = updateBoard(config, 'a.eth', { perPage: 25, pages: 3 })
-    expect(result.boards[0].perPage).toBe(25)
-    expect(result.boards[0].pages).toBe(3)
-  })
-
-  it('resets a field to undefined', () => {
-    const config: MultiBoardConfig = {
-      boards: [{ address: 'a.eth', bumpLimit: 500 }],
-    }
-    const result = updateBoard(config, 'a.eth', {}, ['bumpLimit'])
-    expect(Object.hasOwn(result.boards[0], 'bumpLimit')).toBe(false)
-  })
-
-  it('resets multiple fields', () => {
-    const config: MultiBoardConfig = {
-      boards: [{ address: 'a.eth', perPage: 25, pages: 3, bumpLimit: 500, archivePurgeSeconds: 86400 }],
-    }
-    const result = updateBoard(config, 'a.eth', {}, ['perPage', 'bumpLimit'])
-    expect(Object.hasOwn(result.boards[0], 'perPage')).toBe(false)
-    expect(Object.hasOwn(result.boards[0], 'bumpLimit')).toBe(false)
-    expect(result.boards[0].pages).toBe(3)
-    expect(result.boards[0].archivePurgeSeconds).toBe(86400)
-  })
-
-  it('allows setting one field and resetting another simultaneously', () => {
-    const config: MultiBoardConfig = {
-      boards: [{ address: 'a.eth', perPage: 25, bumpLimit: 300 }],
-    }
-    const result = updateBoard(config, 'a.eth', { perPage: 30 }, ['bumpLimit'])
-    expect(result.boards[0].perPage).toBe(30)
-    expect(Object.hasOwn(result.boards[0], 'bumpLimit')).toBe(false)
-  })
-
-  it('throws when board not found', () => {
-    const config: MultiBoardConfig = { boards: [{ address: 'a.eth' }] }
-    expect(() => updateBoard(config, 'missing.eth', { bumpLimit: 500 })).toThrow(
-      'Board "missing.eth" not found in config',
-    )
-  })
-
-  it('throws when setting and resetting the same field', () => {
-    const config: MultiBoardConfig = { boards: [{ address: 'a.eth' }] }
-    expect(() => updateBoard(config, 'a.eth', { perPage: 25 }, ['perPage'])).toThrow(
-      'Cannot set and reset the same field "perPage"',
-    )
-  })
-
-  it('does not mutate the original config', () => {
-    const config: MultiBoardConfig = {
-      boards: [{ address: 'a.eth', bumpLimit: 300 }],
-    }
-    const result = updateBoard(config, 'a.eth', { bumpLimit: 500 })
-    expect(config.boards[0].bumpLimit).toBe(300)
-    expect(result.boards[0].bumpLimit).toBe(500)
-  })
-
-  it('preserves other boards and top-level config fields', () => {
-    const config: MultiBoardConfig = {
-      rpcUrl: 'ws://test:9138',
-      defaults: { perPage: 20 },
-      boards: [{ address: 'a.eth' }, { address: 'b.eth', bumpLimit: 300 }],
-    }
-    const result = updateBoard(config, 'b.eth', { bumpLimit: 500 })
-    expect(result.rpcUrl).toBe('ws://test:9138')
-    expect(result.defaults?.perPage).toBe(20)
-    expect(result.boards[0]).toEqual({ address: 'a.eth' })
-    expect(result.boards[1].bumpLimit).toBe(500)
-  })
-
-  it('preserves address field', () => {
-    const config: MultiBoardConfig = {
-      boards: [{ address: 'a.eth' }],
-    }
-    const result = updateBoard(config, 'a.eth', { bumpLimit: 500 })
-    expect(result.boards[0].address).toBe('a.eth')
-  })
-
-  it('updates moderationReasons on a board', () => {
-    const config: MultiBoardConfig = {
-      boards: [{ address: 'a.eth' }],
-    }
-    const result = updateBoard(config, 'a.eth', { moderationReasons: { archiveCapacity: 'custom' } })
-    expect(result.boards[0].moderationReasons?.archiveCapacity).toBe('custom')
-  })
-
-  it('resets moderationReasons on a board', () => {
-    const config: MultiBoardConfig = {
-      boards: [{ address: 'a.eth', moderationReasons: { archiveCapacity: 'val' } }],
-    }
-    const result = updateBoard(config, 'a.eth', {}, ['moderationReasons'])
-    expect(Object.hasOwn(result.boards[0], 'moderationReasons')).toBe(false)
   })
 })

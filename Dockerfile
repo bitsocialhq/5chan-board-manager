@@ -51,4 +51,4 @@ ENV XDG_CONFIG_HOME=/data
 VOLUME ["/data"]
 
 ENTRYPOINT ["tini", "--"]
-CMD ["5chan", "start", "--config", "/data/config.json"]
+CMD ["5chan", "start"]

@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { saveBoardConfig, saveGlobalConfig } from '../config-manager.js'
 
 vi.mock('../board-managers.js', () => ({
   startBoardManagers: vi.fn(),
@@ -15,6 +16,10 @@ const mockStartManager = vi.mocked(startBoardManagers)
 
 function makeTmpDir(): string {
   return mkdtempSync(join(tmpdir(), 'start-test-'))
+}
+
+function writeBoardConfig(dir: string, board: { address: string;[key: string]: unknown }): void {
+  saveBoardConfig(dir, board as Parameters<typeof saveBoardConfig>[1])
 }
 
 function makeMockManager(overrides?: Partial<BoardManagers>): BoardManagers {
@@ -81,35 +86,30 @@ describe('start command', () => {
     mockStartManager.mockResolvedValue(manager)
 
     const dir = tmpDir()
-    const configPath = join(dir, 'config.json')
-    writeFileSync(configPath, JSON.stringify({
-      boards: [{ address: 'a.eth' }],
-    }))
+    writeBoardConfig(dir, { address: 'a.eth' })
 
     await runCommand([], dir)
 
     expect(mockStartManager).toHaveBeenCalledOnce()
-    const [path, config] = mockStartManager.mock.calls[0]
-    expect(path).toBe(configPath)
+    const [configDir, config] = mockStartManager.mock.calls[0]
+    expect(configDir).toBe(dir)
     expect(config.boards[0].address).toBe('a.eth')
   })
 
-  it('uses custom config path when --config flag provided', async () => {
+  it('uses custom config dir when --config-dir flag provided', async () => {
     const manager = makeMockManager({
       boardManagers: new Map([['a.eth', { stop: vi.fn() }]]),
     })
     mockStartManager.mockResolvedValue(manager)
 
     const dir = tmpDir()
-    const customPath = join(dir, 'custom.json')
-    writeFileSync(customPath, JSON.stringify({
-      boards: [{ address: 'a.eth' }],
-    }))
+    const customDir = join(dir, 'custom')
+    writeBoardConfig(customDir, { address: 'a.eth' })
 
-    await runCommand(['--config', customPath], dir)
+    await runCommand(['--config-dir', customDir], dir)
 
-    const [path] = mockStartManager.mock.calls[0]
-    expect(path).toBe(customPath)
+    const [configDir] = mockStartManager.mock.calls[0]
+    expect(configDir).toBe(customDir)
   })
 
   it('prints startup summary', async () => {
@@ -119,10 +119,7 @@ describe('start command', () => {
     mockStartManager.mockResolvedValue(manager)
 
     const dir = tmpDir()
-    const configPath = join(dir, 'config.json')
-    writeFileSync(configPath, JSON.stringify({
-      boards: [{ address: 'a.eth' }],
-    }))
+    writeBoardConfig(dir, { address: 'a.eth' })
 
     const { stdout } = await runCommand([], dir)
     expect(stdout).toContain('Starting board managers for 1 board(s)')
@@ -138,10 +135,7 @@ describe('start command', () => {
     )
 
     const dir = tmpDir()
-    const configPath = join(dir, 'config.json')
-    writeFileSync(configPath, JSON.stringify({
-      boards: [{ address: 'a.eth' }],
-    }))
+    writeBoardConfig(dir, { address: 'a.eth' })
 
     await expect(runCommand([], dir)).rejects.toThrow(
       'All 1 board(s) failed to start',
@@ -156,10 +150,8 @@ describe('start command', () => {
     mockStartManager.mockResolvedValue(manager)
 
     const dir = tmpDir()
-    const configPath = join(dir, 'config.json')
-    writeFileSync(configPath, JSON.stringify({
-      boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
-    }))
+    writeBoardConfig(dir, { address: 'a.eth' })
+    writeBoardConfig(dir, { address: 'b.eth' })
 
     const { stdout, stderr } = await runCommand([], dir)
     expect(stdout).toContain('1 failed')

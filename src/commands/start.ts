@@ -1,38 +1,37 @@
 import { Command, Flags } from '@oclif/core'
-import { join } from 'node:path'
 import { loadConfig } from '../config-manager.js'
 import { startBoardManagers } from '../board-managers.js'
 
 export default class Start extends Command {
-  static override description = 'Start board managers, watching the config file for changes'
+  static override description = 'Start board managers, watching the config directory for changes'
 
   static override examples = [
     '5chan start',
-    '5chan start --config /path/to/config.json',
+    '5chan start --config-dir /path/to/config',
   ]
 
   static override flags = {
-    config: Flags.string({
+    'config-dir': Flags.string({
       char: 'c',
-      description: 'Path to config file (overrides default)',
+      description: 'Path to config directory (overrides default)',
     }),
   }
 
   async run(): Promise<void> {
     const { flags } = await this.parse(Start)
-    const configPath = flags.config ?? join(this.config.configDir, 'config.json')
+    const configDir = flags['config-dir'] ?? this.config.configDir
 
-    const config = loadConfig(configPath)
+    const config = loadConfig(configDir)
 
     if (config.boards.length === 0) {
       this.error('No boards configured. Use "5chan board add <address>" to add boards first.')
     }
 
     this.log(`Starting board managers for ${config.boards.length} board(s)...`)
-    this.log(`Config: ${configPath}`)
-    this.log(`Watching config file for changes`)
+    this.log(`Config: ${configDir}`)
+    this.log(`Watching config directory for changes`)
 
-    const manager = await startBoardManagers(configPath, config)
+    const manager = await startBoardManagers(configDir, config)
 
     const started = manager.boardManagers.size
     const failed = manager.errors.size

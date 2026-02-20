@@ -25,10 +25,21 @@ A CLI tool that implements 4chan-style thread auto-archiving and purging for 5ch
 - Purge via `createCommentModeration({ commentModeration: { purged: true } })`
 - Duplicate purge moderations (if the board hasn't processed prior purge yet) are harmless no-ops
 
-### Config File Format
+### Config Directory Layout
 
-The config file (`~/.config/5chan/config.json`) is managed via `5chan board add/edit/remove` or manual editing:
+Config is stored as one file per board under `~/.config/5chan/`, managed via `5chan board add/edit/remove` or manual editing:
 
+```
+~/.config/5chan/
+├── global.json              # shared settings (rpcUrl, stateDir, defaults)
+└── boards/
+    ├── random.eth.json      # { "address": "random.eth" }
+    ├── tech.eth.json        # { "address": "tech.eth", "bumpLimit": 500 }
+    ├── flash.eth.json       # { "address": "flash.eth", "perPage": 30, "pages": 1 }
+    └── custom.eth.json      # { "address": "custom.eth", "moderationReasons": { ... } }
+```
+
+**global.json** (optional):
 ```json
 {
   "rpcUrl": "ws://localhost:9138",
@@ -44,24 +55,19 @@ The config file (`~/.config/5chan/config.json`) is managed via `5chan board add/
       "purgeArchived": "5chan board manager: thread purged — archive retention expired",
       "purgeDeleted": "5chan board manager: content purged — author-deleted"
     }
-  },
-  "boards": [
-    { "address": "random.eth" },
-    { "address": "tech.eth", "bumpLimit": 500 },
-    { "address": "flash.eth", "perPage": 30, "pages": 1 },
-    { "address": "custom.eth", "moderationReasons": { "archiveCapacity": "Custom archive reason for this board" } }
-  ]
+  }
 }
 ```
 
-**Minimal config:** `{ "boards": [{ "address": "my-board.eth" }] }`
+**Minimal config:** a single file `boards/my-board.eth.json` containing `{ "address": "my-board.eth" }`
 
-All fields except `boards[].address` are optional:
+All fields except each board's `address` are optional:
 - `rpcUrl` — falls back to `PLEBBIT_RPC_WS_URL` env var, then `ws://localhost:9138`
 - `stateDir` — falls back to OS data directory
 - `defaults` — applied to all boards unless overridden per-board
 - Per-board fields (`perPage`, `pages`, `bumpLimit`, `archivePurgeSeconds`, `moderationReasons`) override `defaults`
 - `moderationReasons` — optional object with `archiveCapacity`, `archiveBumpLimit`, `purgeArchived`, `purgeDeleted` string fields. Per-board values override defaults per-field (not the whole object). These reason strings are passed to `createCommentModeration()` so plebbit clients can display why a thread was archived or purged.
+- Board filenames must match the address: `{address}.json`
 
 
 
@@ -73,7 +79,7 @@ If you **don't** already have [bitsocial-cli](https://github.com/bitsocialhq/bit
 
 ```bash
 cp docker-compose.example.yml docker-compose.yml
-# Create /data/config.json with your boards (see Config File Format above)
+# Add boards via 5chan board add (see Config Directory Layout above)
 docker compose up -d
 ```
 
@@ -106,7 +112,7 @@ If you **already** have bitsocial-cli running separately (on the host, in anothe
 ```bash
 cp docker-compose.standalone.example.yml docker-compose.yml
 # Edit PLEBBIT_RPC_WS_URL in docker-compose.yml to point at your running bitsocial-cli
-# Create /data/config.json with your boards (see Config File Format above)
+# Add boards via 5chan board add (see Config Directory Layout above)
 docker compose up -d
 ```
 
@@ -141,7 +147,7 @@ docker compose exec 5chan 5chan board edit random.eth --reset moderation-reasons
 docker compose exec 5chan 5chan board remove random.eth
 ```
 
-The container auto-reloads when `/data/config.json` changes, so boards added/edited via `5chan board add/edit` take effect immediately without restarting.
+The container auto-reloads when files in the config directory change, so boards added/edited via `5chan board add/edit` take effect immediately without restarting.
 
 ### Build locally
 
@@ -154,7 +160,8 @@ docker run -d -v /path/to/data:/data 5chan-board-manager
 
 | Container path | Description |
 |---|---|
-| `/data/config.json` | Board configuration (create before first run, or use `5chan board add`) |
+| `/data/5chan/global.json` | Global config (optional — rpcUrl, stateDir, defaults) |
+| `/data/5chan/boards/*.json` | Per-board config files (created by `5chan board add`) |
 | `/data/5chan-board-manager/` | Per-board state files (auto-created) |
 
 ### Board creation and defaults preset
@@ -337,22 +344,22 @@ _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v6.2.3
 
 ## `5chan start`
 
-Start board managers, watching the config file for changes
+Start board managers, watching the config directory for changes
 
 ```
 USAGE
   $ 5chan start [-c <value>]
 
 FLAGS
-  -c, --config=<value>  Path to config file (overrides default)
+  -c, --config-dir=<value>  Path to config directory (overrides default)
 
 DESCRIPTION
-  Start board managers, watching the config file for changes
+  Start board managers, watching the config directory for changes
 
 EXAMPLES
   $ 5chan start
 
-  $ 5chan start --config /path/to/config.json
+  $ 5chan start --config-dir /path/to/config
 ```
 
 _See code: [src/commands/start.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.0/src/commands/start.ts)_
@@ -360,7 +367,7 @@ _See code: [src/commands/start.ts](https://github.com/bitsocialhq/5chan-board-ma
 
 ## Config Hot-Reload
 
-`5chan start` watches the config file using `fs.watch()` with a 200ms debounce. When the file changes:
+`5chan start` watches the config directory (`boards/` and `global.json`) using `fs.watch()` with a 200ms debounce. When any config file changes:
 
 1. Loads and validates the new config
 2. Diffs old vs new boards
@@ -369,7 +376,7 @@ _See code: [src/commands/start.ts](https://github.com/bitsocialhq/5chan-board-ma
 5. Starts board managers for added boards
 6. Logs the delta: `config reloaded: +N added, -N removed, ~N changed, M running`
 
-This means you can add, edit, or remove boards while the board manager is running — either by editing the config file directly or by running `5chan board add/edit/remove` in another terminal.
+This means you can add, edit, or remove boards while the board manager is running — either by editing config files directly or by running `5chan board add/edit/remove` in another terminal. When global config changes (rpcUrl, stateDir, defaults), all running boards are restarted.
 
 ## File Locking
 

@@ -1,12 +1,18 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, mkdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { loadConfig } from '../../config-manager.js'
+import { saveBoardConfig, loadConfig } from '../../config-manager.js'
 import BoardRemove from './remove.js'
 
 function makeTmpDir(): string {
   return mkdtempSync(join(tmpdir(), 'board-remove-test-'))
+}
+
+function writeBoardConfig(dir: string, board: { address: string;[key: string]: unknown }): void {
+  const boardsDir = join(dir, 'boards')
+  mkdirSync(boardsDir, { recursive: true })
+  saveBoardConfig(dir, board as Parameters<typeof saveBoardConfig>[1])
 }
 
 async function runCommand(args: string[], configDir: string): Promise<{ stdout: string }> {
@@ -46,51 +52,39 @@ describe('board remove command', () => {
 
   it('removes a board from the config', async () => {
     const dir = tmpDir()
-    const configPath = join(dir, 'config.json')
-    writeFileSync(configPath, JSON.stringify({
-      boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
-    }))
+    writeBoardConfig(dir, { address: 'a.eth' })
+    writeBoardConfig(dir, { address: 'b.eth' })
 
     await runCommand(['a.eth'], dir)
 
-    const config = loadConfig(configPath)
-    expect(config.boards).toHaveLength(1)
-    expect(config.boards[0].address).toBe('b.eth')
+    expect(existsSync(join(dir, 'boards', 'a.eth.json'))).toBe(false)
+    expect(existsSync(join(dir, 'boards', 'b.eth.json'))).toBe(true)
   })
 
   it('throws when board not found', async () => {
     const dir = tmpDir()
-    const configPath = join(dir, 'config.json')
-    writeFileSync(configPath, JSON.stringify({
-      boards: [{ address: 'a.eth' }],
-    }))
+    writeBoardConfig(dir, { address: 'a.eth' })
 
     await expect(runCommand(['missing.eth'], dir)).rejects.toThrow('not found')
   })
 
   it('prints confirmation message', async () => {
     const dir = tmpDir()
-    const configPath = join(dir, 'config.json')
-    writeFileSync(configPath, JSON.stringify({
-      boards: [{ address: 'board.eth' }],
-    }))
+    writeBoardConfig(dir, { address: 'board.eth' })
 
     const { stdout } = await runCommand(['board.eth'], dir)
     expect(stdout).toContain('Removed board "board.eth"')
   })
 
-  it('preserves other config fields', async () => {
+  it('does not affect other board files', async () => {
     const dir = tmpDir()
-    const configPath = join(dir, 'config.json')
-    writeFileSync(configPath, JSON.stringify({
-      rpcUrl: 'ws://test:9138',
-      boards: [{ address: 'a.eth' }],
-    }))
+    writeBoardConfig(dir, { address: 'a.eth' })
+    writeBoardConfig(dir, { address: 'b.eth' })
 
     await runCommand(['a.eth'], dir)
 
-    const config = loadConfig(configPath)
-    expect(config.rpcUrl).toBe('ws://test:9138')
-    expect(config.boards).toHaveLength(0)
+    const config = loadConfig(dir)
+    expect(config.boards).toHaveLength(1)
+    expect(config.boards[0].address).toBe('b.eth')
   })
 })

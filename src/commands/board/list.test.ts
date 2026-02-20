@@ -1,11 +1,16 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { saveBoardConfig, saveGlobalConfig } from '../../config-manager.js'
 import BoardList from './list.js'
 
 function makeTmpDir(): string {
   return mkdtempSync(join(tmpdir(), 'board-list-test-'))
+}
+
+function writeBoardConfig(dir: string, board: { address: string;[key: string]: unknown }): void {
+  saveBoardConfig(dir, board as Parameters<typeof saveBoardConfig>[1])
 }
 
 async function runCommand(args: string[], configDir: string): Promise<{ stdout: string }> {
@@ -51,10 +56,8 @@ describe('board list command', () => {
 
   it('lists boards', async () => {
     const dir = tmpDir()
-    const configPath = join(dir, 'config.json')
-    writeFileSync(configPath, JSON.stringify({
-      boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
-    }))
+    writeBoardConfig(dir, { address: 'a.eth' })
+    writeBoardConfig(dir, { address: 'b.eth' })
 
     const { stdout } = await runCommand([], dir)
     expect(stdout).toContain('a.eth')
@@ -64,10 +67,7 @@ describe('board list command', () => {
 
   it('shows per-board overrides', async () => {
     const dir = tmpDir()
-    const configPath = join(dir, 'config.json')
-    writeFileSync(configPath, JSON.stringify({
-      boards: [{ address: 'a.eth', bumpLimit: 500, perPage: 30 }],
-    }))
+    writeBoardConfig(dir, { address: 'a.eth', bumpLimit: 500, perPage: 30 })
 
     const { stdout } = await runCommand([], dir)
     expect(stdout).toContain('bumpLimit=500')
@@ -76,11 +76,8 @@ describe('board list command', () => {
 
   it('shows RPC URL from config', async () => {
     const dir = tmpDir()
-    const configPath = join(dir, 'config.json')
-    writeFileSync(configPath, JSON.stringify({
-      rpcUrl: 'ws://custom:9138',
-      boards: [{ address: 'a.eth' }],
-    }))
+    saveGlobalConfig(dir, { rpcUrl: 'ws://custom:9138' })
+    writeBoardConfig(dir, { address: 'a.eth' })
 
     const { stdout } = await runCommand([], dir)
     expect(stdout).toContain('ws://custom:9138')
@@ -92,7 +89,7 @@ describe('board list command', () => {
     expect(stdout).toContain('default: ws://localhost:9138')
   })
 
-  it('shows config path', async () => {
+  it('shows config directory path', async () => {
     const dir = tmpDir()
     const { stdout } = await runCommand([], dir)
     expect(stdout).toContain(dir)

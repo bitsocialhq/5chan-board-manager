@@ -110,7 +110,7 @@ export async function loadCommunityDefaultsPreset(
 
   let parsed: unknown
   try {
-    parsed = JSON.parse(stripJsonComments(raw))
+    parsed = JSON.parse(stripJsonComments(raw, { trailingCommas: true }))
   } catch (err) {
     throw new Error(
       `Invalid JSON in community defaults preset "${presetPath}": ${(err as Error).message}`,

@@ -110,6 +110,25 @@ describe('community defaults preset loading', () => {
     expect(preset.boardManagerSettings.perPage).toBe(20)
   })
 
+  it('loads a valid preset jsonc file with trailing commas', async () => {
+    const dir = tmpDir()
+    const presetPath = join(dir, 'preset.jsonc')
+    writeFileSync(presetPath, [
+      '{',
+      '  "boardSettings": {',
+      '    "features": { "noUpvotes": true },',
+      '  },',
+      '  "boardManagerSettings": {',
+      '    "perPage": 10,',
+      '  },',
+      '}',
+    ].join('\n'))
+
+    const preset = await loadCommunityDefaultsPreset(presetPath)
+    expect(preset.boardSettings.features?.noUpvotes).toBe(true)
+    expect(preset.boardManagerSettings.perPage).toBe(10)
+  })
+
   it('throws when preset json is invalid', async () => {
     const dir = tmpDir()
     const presetPath = join(dir, 'bad.json')

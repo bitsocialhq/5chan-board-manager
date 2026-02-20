@@ -3,7 +3,7 @@ name: Docker Publish
 on:
   workflow_run:
     workflows:
-      - "CI build"
+      - "Docker Compose CI"
     types:
       - "completed"
 

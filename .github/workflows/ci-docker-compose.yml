@@ -1,0 +1,253 @@
+name: Docker Compose CI
+
+on:
+  # Gates Docker Publish — runs after CI build passes on master
+  workflow_run:
+    workflows: ["CI build"]
+    types: ["completed"]
+  # PR feedback — only when Docker-relevant files change
+  pull_request:
+    branches: [master]
+    paths:
+      - "src/**"
+      - "bin/**"
+      - "Dockerfile"
+      - "docker-compose*.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
+      - ".github/workflows/ci-docker-compose.yml"
+
+jobs:
+  full-stack:
+    name: Full-stack (bitsocial + 5chan)
+    if: ${{ github.event_name == 'pull_request' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build 5chan image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: 5chan-board-manager:ci-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Prepare compose files
+        run: |
+          cp docker-compose.example.yml docker-compose.yml
+
+          cat > docker-compose.override.yml <<'EOF'
+          services:
+            5chan:
+              image: 5chan-board-manager:ci-test
+              command: ["sleep", "infinity"]
+          EOF
+
+      - name: Start services
+        run: docker compose up -d --wait
+
+      - name: Wait for bitsocial RPC
+        run: |
+          echo "Waiting for bitsocial RPC to become ready..."
+          for i in $(seq 1 30); do
+            if docker compose exec -T bitsocial bitsocial community list 2>/dev/null; then
+              echo "bitsocial RPC is ready"
+              exit 0
+            fi
+            echo "  attempt $i/30 — retrying in 5s..."
+            sleep 5
+          done
+          echo "ERROR: bitsocial RPC did not become ready in 150s"
+          exit 1
+
+      - name: Create test community
+        run: docker compose exec -T bitsocial bitsocial community create
+
+      - name: Extract community address
+        id: community
+        run: |
+          ADDRESS=$(docker compose exec -T bitsocial bitsocial community list | head -n1 | tr -d '[:space:]')
+          echo "address=$ADDRESS" >> "$GITHUB_OUTPUT"
+          echo "Community address: $ADDRESS"
+
+      - name: Add board with defaults
+        run: |
+          docker compose exec -T 5chan \
+            5chan board add "${{ steps.community.outputs.address }}" --apply-defaults
+
+      - name: Verify boardSettings via RPC
+        run: |
+          COMMUNITY_JSON=$(docker compose exec -T bitsocial \
+            bitsocial community get "${{ steps.community.outputs.address }}")
+
+          echo "$COMMUNITY_JSON" | jq .
+
+          # features
+          echo "$COMMUNITY_JSON" | jq -e '.features.noUpvotes == true'
+          echo "$COMMUNITY_JSON" | jq -e '.features.noDownvotes == true'
+          echo "$COMMUNITY_JSON" | jq -e '.features.requirePostLink == true'
+          echo "$COMMUNITY_JSON" | jq -e '.features.requirePostLinkIsMedia == true'
+          echo "$COMMUNITY_JSON" | jq -e '.features.requireReplyLink == false'
+          echo "$COMMUNITY_JSON" | jq -e '.features.requireReplyLinkIsMedia == true'
+          echo "$COMMUNITY_JSON" | jq -e '.features.pseudonymityMode == "per-post"'
+
+          # challenges
+          echo "$COMMUNITY_JSON" | jq -e '.settings.challenges | length == 4'
+
+      - name: Verify boardManagerSettings in config
+        run: |
+          BOARD_JSON=$(docker compose exec -T 5chan \
+            cat "/data/5chan/boards/${{ steps.community.outputs.address }}.json")
+
+          echo "$BOARD_JSON" | jq .
+
+          echo "$BOARD_JSON" | jq -e '.perPage == 15'
+          echo "$BOARD_JSON" | jq -e '.pages == 10'
+          echo "$BOARD_JSON" | jq -e '.bumpLimit == 300'
+          echo "$BOARD_JSON" | jq -e '.archivePurgeSeconds == 172800'
+          echo "$BOARD_JSON" | jq -e '.moderationReasons | keys | length == 4'
+          echo "$BOARD_JSON" | jq -e '.moderationReasons | has("archiveCapacity", "archiveBumpLimit", "purgeArchived", "purgeDeleted")'
+
+      - name: Verify board list
+        run: |
+          BOARD_LIST=$(docker compose exec -T 5chan 5chan board list)
+          echo "$BOARD_LIST"
+          echo "$BOARD_LIST" | grep -qF "${{ steps.community.outputs.address }}"
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v
+
+  standalone:
+    name: Standalone (5chan only, external bitsocial)
+    if: ${{ github.event_name == 'pull_request' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build 5chan image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: 5chan-board-manager:ci-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Start bitsocial separately
+        run: |
+          docker run -d --name bitsocial -p 9138:9138 \
+            ghcr.io/bitsocialhq/bitsocial-cli:latest
+
+      - name: Wait for bitsocial RPC
+        run: |
+          echo "Waiting for bitsocial RPC to become ready..."
+          for i in $(seq 1 30); do
+            if docker exec bitsocial bitsocial community list 2>/dev/null; then
+              echo "bitsocial RPC is ready"
+              exit 0
+            fi
+            echo "  attempt $i/30 — retrying in 5s..."
+            sleep 5
+          done
+          echo "ERROR: bitsocial RPC did not become ready in 150s"
+          exit 1
+
+      - name: Prepare compose files
+        run: |
+          cp docker-compose.standalone.example.yml docker-compose.yml
+
+          cat > docker-compose.override.yml <<'EOF'
+          services:
+            5chan:
+              image: 5chan-board-manager:ci-test
+              command: ["sleep", "infinity"]
+          EOF
+
+      - name: Start 5chan
+        run: docker compose up -d
+
+      - name: Create test community
+        run: docker exec bitsocial bitsocial community create
+
+      - name: Extract community address
+        id: community
+        run: |
+          ADDRESS=$(docker exec bitsocial bitsocial community list | head -n1 | tr -d '[:space:]')
+          echo "address=$ADDRESS" >> "$GITHUB_OUTPUT"
+          echo "Community address: $ADDRESS"
+
+      - name: Add board with defaults
+        run: |
+          docker compose exec -T 5chan \
+            5chan board add "${{ steps.community.outputs.address }}" --apply-defaults
+
+      - name: Verify boardSettings via RPC
+        run: |
+          COMMUNITY_JSON=$(docker exec bitsocial \
+            bitsocial community get "${{ steps.community.outputs.address }}")
+
+          echo "$COMMUNITY_JSON" | jq .
+
+          # features
+          echo "$COMMUNITY_JSON" | jq -e '.features.noUpvotes == true'
+          echo "$COMMUNITY_JSON" | jq -e '.features.noDownvotes == true'
+          echo "$COMMUNITY_JSON" | jq -e '.features.requirePostLink == true'
+          echo "$COMMUNITY_JSON" | jq -e '.features.requirePostLinkIsMedia == true'
+          echo "$COMMUNITY_JSON" | jq -e '.features.requireReplyLink == false'
+          echo "$COMMUNITY_JSON" | jq -e '.features.requireReplyLinkIsMedia == true'
+          echo "$COMMUNITY_JSON" | jq -e '.features.pseudonymityMode == "per-post"'
+
+          # challenges
+          echo "$COMMUNITY_JSON" | jq -e '.settings.challenges | length == 4'
+
+      - name: Verify boardManagerSettings in config
+        run: |
+          BOARD_JSON=$(docker compose exec -T 5chan \
+            cat "/data/5chan/boards/${{ steps.community.outputs.address }}.json")
+
+          echo "$BOARD_JSON" | jq .
+
+          echo "$BOARD_JSON" | jq -e '.perPage == 15'
+          echo "$BOARD_JSON" | jq -e '.pages == 10'
+          echo "$BOARD_JSON" | jq -e '.bumpLimit == 300'
+          echo "$BOARD_JSON" | jq -e '.archivePurgeSeconds == 172800'
+          echo "$BOARD_JSON" | jq -e '.moderationReasons | keys | length == 4'
+          echo "$BOARD_JSON" | jq -e '.moderationReasons | has("archiveCapacity", "archiveBumpLimit", "purgeArchived", "purgeDeleted")'
+
+      - name: Verify board list
+        run: |
+          BOARD_LIST=$(docker compose exec -T 5chan 5chan board list)
+          echo "$BOARD_LIST"
+          echo "$BOARD_LIST" | grep -qF "${{ steps.community.outputs.address }}"
+
+      - name: Dump logs on failure
+        if: failure()
+        run: |
+          docker compose logs
+          docker logs bitsocial
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose down -v
+          docker rm -f bitsocial || true

@@ -137,6 +137,9 @@ docker compose exec 5chan 5chan board list
 # Edit a board's config
 docker compose exec 5chan 5chan board edit random.eth --bump-limit 500
 
+# Open a board's config in $EDITOR for interactive editing
+docker compose exec 5chan 5chan board edit random.eth -i
+
 # Reset a board field to global default
 docker compose exec 5chan 5chan board edit random.eth --reset per-page
 
@@ -261,12 +264,13 @@ Edit 5chan settings for an existing board
 ```
 USAGE
   $ 5chan board edit ADDRESS [--per-page <value>] [--pages <value>] [--bump-limit <value>]
-    [--archive-purge-seconds <value>] [--reset <value>]
+    [--archive-purge-seconds <value>] [--reset <value>] [-i]
 
 ARGUMENTS
   ADDRESS  Board address to edit
 
 FLAGS
+  -i, --interactive                Open the board config in $EDITOR for interactive editing
   --archive-purge-seconds=<value>  Seconds after archiving before purge
   --bump-limit=<value>             Bump limit for threads
   --pages=<value>                  Number of pages
@@ -278,6 +282,7 @@ DESCRIPTION
   Edit 5chan settings for an existing board
 
   This command configures how 5chan manages the board (pagination, bump limits, archiving).
+  Use --interactive (-i) to open the board config in $EDITOR for direct viewing/editing.
   To edit board settings (title, description, rules, etc.), use a WebUI or bitsocial-cli:
   https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address
 
@@ -291,20 +296,26 @@ EXAMPLES
   $ 5chan board edit random.eth --per-page 20 --reset bump-limit
 
   $ 5chan board edit random.eth --reset moderation-reasons
+
+  $ 5chan board edit random.eth --interactive
+
+  $ 5chan board edit random.eth -i
 ```
 
 _See code: [src/commands/board/edit.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.0/src/commands/board/edit.ts)_
 
 ## `5chan board list`
 
-List all boards in the config
+List all board addresses
 
 ```
 USAGE
   $ 5chan board list
 
 DESCRIPTION
-  List all boards in the config
+  List all board addresses
+
+  Outputs one address per line, suitable for piping to other commands.
 
 EXAMPLES
   $ 5chan board list

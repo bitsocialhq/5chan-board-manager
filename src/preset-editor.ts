@@ -102,27 +102,27 @@ export function resolveEditor(): string {
   return platform() === 'win32' ? 'notepad' : 'vi'
 }
 
-/** Open a preset JSONC in the user's editor and return the raw edited content. */
-export function openPresetInEditor(
-  rawJsonc: string,
-  editorCommand?: string,
-): Promise<string> {
-  const editor = editorCommand ?? resolveEditor()
-  const dir = mkdtempSync(join(tmpdir(), '5chan-preset-'))
-  const filePath = join(dir, 'preset.jsonc')
+export interface OpenInEditorOptions {
+  filename?: string
+  editorCommand?: string
+}
 
-  writeFileSync(filePath, rawJsonc, 'utf-8')
+/** Open content in the user's editor and return the edited content. */
+export function openInEditor(
+  content: string,
+  options?: OpenInEditorOptions,
+): Promise<string> {
+  const editor = options?.editorCommand ?? resolveEditor()
+  const filename = options?.filename ?? 'edit.json'
+  const dir = mkdtempSync(join(tmpdir(), '5chan-edit-'))
+  const filePath = join(dir, filename)
+
+  writeFileSync(filePath, content, 'utf-8')
 
   return new Promise<string>((resolve, reject) => {
     const parts = editor.split(/\s+/)
     const cmd = parts[0]
     const editorArgs = parts.slice(1)
-
-    // Nano doesn't recognise .jsonc — force JSON syntax highlighting
-    const basename = cmd.split('/').pop() ?? ''
-    if (basename === 'nano') {
-      editorArgs.push('--syntax=json')
-    }
 
     const args = [...editorArgs, filePath]
 
@@ -140,18 +140,36 @@ export function openPresetInEditor(
         return
       }
 
-      let content: string
+      let edited: string
       try {
-        content = readFileSync(filePath, 'utf-8')
+        edited = readFileSync(filePath, 'utf-8')
       } catch {
         cleanup(filePath)
-        reject(new Error('Preset file was deleted or became unreadable after editing'))
+        reject(new Error('File was deleted or became unreadable after editing'))
         return
       }
 
       cleanup(filePath)
-      resolve(content)
+      resolve(edited)
     })
+  })
+}
+
+/** Open a preset JSONC in the user's editor and return the raw edited content. */
+export function openPresetInEditor(
+  rawJsonc: string,
+  editorCommand?: string,
+): Promise<string> {
+  const editor = editorCommand ?? resolveEditor()
+
+  // Nano doesn't recognise .jsonc — force JSON syntax highlighting
+  const parts = editor.split(/\s+/)
+  const basename = (parts[0].split('/').pop()) ?? ''
+  const nanoEditor = basename === 'nano' ? `${editor} --syntax=json` : editor
+
+  return openInEditor(rawJsonc, {
+    filename: 'preset.jsonc',
+    editorCommand: nanoEditor,
   })
 }
 

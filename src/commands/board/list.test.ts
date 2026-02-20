@@ -1,8 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { saveBoardConfig, saveGlobalConfig } from '../../config-manager.js'
+import { saveBoardConfig } from '../../config-manager.js'
 import BoardList from './list.js'
 
 function makeTmpDir(): string {
@@ -62,36 +62,29 @@ describe('board list command', () => {
     const { stdout } = await runCommand([], dir)
     expect(stdout).toContain('a.eth')
     expect(stdout).toContain('b.eth')
-    expect(stdout).toContain('Boards (2)')
   })
 
-  it('shows per-board overrides', async () => {
+  it('outputs one address per line', async () => {
+    const dir = tmpDir()
+    writeBoardConfig(dir, { address: 'a.eth' })
+    writeBoardConfig(dir, { address: 'b.eth' })
+    writeBoardConfig(dir, { address: 'c.eth' })
+
+    const { stdout } = await runCommand([], dir)
+    const lines = stdout.trim().split('\n')
+    expect(lines).toHaveLength(3)
+  })
+
+  it('outputs only addresses with no extra text', async () => {
     const dir = tmpDir()
     writeBoardConfig(dir, { address: 'a.eth', bumpLimit: 500, perPage: 30 })
 
     const { stdout } = await runCommand([], dir)
-    expect(stdout).toContain('bumpLimit=500')
-    expect(stdout).toContain('perPage=30')
-  })
-
-  it('shows RPC URL from config', async () => {
-    const dir = tmpDir()
-    saveGlobalConfig(dir, { rpcUrl: 'ws://custom:9138' })
-    writeBoardConfig(dir, { address: 'a.eth' })
-
-    const { stdout } = await runCommand([], dir)
-    expect(stdout).toContain('ws://custom:9138')
-  })
-
-  it('shows default RPC URL when not configured', async () => {
-    const dir = tmpDir()
-    const { stdout } = await runCommand([], dir)
-    expect(stdout).toContain('default: ws://localhost:9138')
-  })
-
-  it('shows config directory path', async () => {
-    const dir = tmpDir()
-    const { stdout } = await runCommand([], dir)
-    expect(stdout).toContain(dir)
+    expect(stdout).not.toContain('bumpLimit')
+    expect(stdout).not.toContain('perPage')
+    expect(stdout).not.toContain('Boards')
+    expect(stdout).not.toContain('Config:')
+    expect(stdout).not.toContain('RPC URL:')
+    expect(stdout.trim()).toBe('a.eth')
   })
 })

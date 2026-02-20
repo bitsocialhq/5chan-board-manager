@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
-import { flattenPreset, formatPresetDisplay, resolveEditor, openPresetInEditor, parsePresetJsonc } from './preset-editor.js'
+import { flattenPreset, formatPresetDisplay, resolveEditor, openInEditor, openPresetInEditor, parsePresetJsonc } from './preset-editor.js'
 import type { FlatPresetEntry } from './preset-editor.js'
 import type { CommunityDefaultsPreset } from './community-defaults.js'
 
@@ -181,6 +181,35 @@ describe('resolveEditor', () => {
     // On Linux (our CI/test env), should return 'vi'
     const result = resolveEditor()
     expect(['vi', 'notepad']).toContain(result)
+  })
+})
+
+describe('openInEditor', () => {
+  it('writes content and returns edited content', async () => {
+    const content = '{"perPage": 15, "pages": 10}\n'
+
+    // Use 'true' as a no-op editor that doesn't modify the file
+    const result = await openInEditor(content, { editorCommand: 'true' })
+
+    expect(result).toBe(content)
+  })
+
+  it('uses custom filename', async () => {
+    const content = '{"key": "value"}\n'
+
+    const result = await openInEditor(content, { filename: 'custom.json', editorCommand: 'true' })
+
+    expect(result).toBe(content)
+  })
+
+  it('throws when editor command fails', async () => {
+    await expect(openInEditor('{}', { editorCommand: 'false' })).rejects.toThrow('Editor exited with code 1')
+  })
+
+  it('throws when editor command is not found', async () => {
+    await expect(
+      openInEditor('{}', { editorCommand: 'nonexistent-editor-command-xyz' }),
+    ).rejects.toThrow('Failed to launch editor')
   })
 })
 

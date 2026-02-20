@@ -1,6 +1,8 @@
 import { Args, Command, Flags } from '@oclif/core'
 import { loadBoardConfig, boardConfigPath, saveBoardConfig, updateBoardConfig } from '../../config-manager.js'
 import { isNonExistentFlagsError } from '../../parse-utils.js'
+import { openInEditor } from '../../preset-editor.js'
+import { BoardManagerSettingsSchema, formatZodIssues } from '../../community-defaults.js'
 import type { BoardConfig } from '../../types.js'
 
 /** Maps kebab-case CLI flag names to camelCase BoardConfig field names */
@@ -23,6 +25,7 @@ export default class BoardEdit extends Command {
   static override description = `Edit 5chan settings for an existing board
 
 This command configures how 5chan manages the board (pagination, bump limits, archiving).
+Use --interactive (-i) to open the board config in $EDITOR for direct viewing/editing.
 To edit board settings (title, description, rules, etc.), use a WebUI or bitsocial-cli:
 https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address`
 
@@ -32,6 +35,8 @@ https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address`
     '5chan board edit random.eth --reset per-page,bump-limit',
     '5chan board edit random.eth --per-page 20 --reset bump-limit',
     '5chan board edit random.eth --reset moderation-reasons',
+    '5chan board edit random.eth --interactive',
+    '5chan board edit random.eth -i',
   ]
 
   static override flags = {
@@ -50,6 +55,11 @@ https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address`
     reset: Flags.string({
       description: 'Comma-separated fields to reset to defaults (per-page, pages, bump-limit, archive-purge-seconds, moderation-reasons)',
     }),
+    interactive: Flags.boolean({
+      char: 'i',
+      description: 'Open the board config in $EDITOR for interactive editing',
+      exclusive: ['per-page', 'pages', 'bump-limit', 'archive-purge-seconds', 'reset'],
+    }),
   }
 
   private async parseWithUnknownFlagCheck() {
@@ -60,7 +70,7 @@ https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address`
         this.error(
           `Unknown option${err.flags.length === 1 ? '' : 's'}: ${err.flags.join(', ')}\n\n` +
           '"board edit" only manages 5chan settings (pagination, bump limits, archiving).\n' +
-          'Valid flags: --per-page, --pages, --bump-limit, --archive-purge-seconds, --reset\n\n' +
+          'Valid flags: --per-page, --pages, --bump-limit, --archive-purge-seconds, --reset, --interactive\n\n' +
           'To edit board settings (title, description, rules, etc.), use a WebUI or bitsocial-cli:\n' +
           'https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address'
         )
@@ -72,6 +82,19 @@ https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address`
   async run(): Promise<void> {
     const { args, flags } = await this.parseWithUnknownFlagCheck()
     const configDir = this.config.configDir
+
+    const filePath = boardConfigPath(configDir, args.address)
+    let board: BoardConfig
+    try {
+      board = loadBoardConfig(filePath)
+    } catch {
+      this.error(`Board "${args.address}" not found in config`)
+    }
+
+    if (flags.interactive) {
+      await this.runInteractive(board, configDir)
+      return
+    }
 
     const updates: Partial<Omit<BoardConfig, 'address'>> = {}
     if (flags['per-page'] !== undefined) updates.perPage = flags['per-page']
@@ -93,20 +116,36 @@ https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address`
     }
 
     if (Object.keys(updates).length === 0 && (!resetFields || resetFields.length === 0)) {
-      this.error('At least one flag (--per-page, --pages, --bump-limit, --archive-purge-seconds) or --reset must be provided')
-    }
-
-    const filePath = boardConfigPath(configDir, args.address)
-    let board: BoardConfig
-    try {
-      board = loadBoardConfig(filePath)
-    } catch {
-      this.error(`Board "${args.address}" not found in config`)
+      this.error('At least one flag (--per-page, --pages, --bump-limit, --archive-purge-seconds, --interactive) or --reset must be provided')
     }
 
     const updated = updateBoardConfig(board, updates, resetFields)
     saveBoardConfig(configDir, updated)
 
     this.log(`Updated board "${args.address}" in ${configDir}`)
+  }
+
+  private async runInteractive(board: BoardConfig, configDir: string): Promise<void> {
+    const { address, ...settings } = board
+    const json = JSON.stringify(settings, null, 2) + '\n'
+
+    const edited = await openInEditor(json)
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(edited)
+    } catch (err) {
+      this.error(`Invalid JSON: ${(err as Error).message}`)
+    }
+
+    const result = BoardManagerSettingsSchema.safeParse(parsed)
+    if (!result.success) {
+      this.error(`Invalid config: ${formatZodIssues(result.error)}`)
+    }
+
+    const updated: BoardConfig = { address, ...result.data }
+    saveBoardConfig(configDir, updated)
+
+    this.log(`Updated board "${address}" in ${configDir}`)
   }
 }

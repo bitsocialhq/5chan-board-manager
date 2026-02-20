@@ -116,7 +116,15 @@ export function openPresetInEditor(
   return new Promise<string>((resolve, reject) => {
     const parts = editor.split(/\s+/)
     const cmd = parts[0]
-    const args = [...parts.slice(1), filePath]
+    const editorArgs = parts.slice(1)
+
+    // Nano doesn't recognise .jsonc — force JSON syntax highlighting
+    const basename = cmd.split('/').pop() ?? ''
+    if (basename === 'nano') {
+      editorArgs.push('--syntax=json')
+    }
+
+    const args = [...editorArgs, filePath]
 
     const child = spawn(cmd, args, { stdio: 'inherit' })
 

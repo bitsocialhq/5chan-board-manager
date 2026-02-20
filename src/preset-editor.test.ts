@@ -220,6 +220,27 @@ describe('openPresetInEditor', () => {
       openPresetInEditor('{}', 'nonexistent-editor-command-xyz'),
     ).rejects.toThrow('Failed to launch editor')
   })
+
+  it('injects --syntax=json when editor is nano', async () => {
+    const { mkdtempSync, writeFileSync, chmodSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const { tmpdir } = await import('node:os')
+
+    // Create a fake "nano" script that dumps all its args into the target file (last arg)
+    const dir = mkdtempSync(join(tmpdir(), '5chan-nano-test-'))
+    const fakeNano = join(dir, 'nano')
+    writeFileSync(
+      fakeNano,
+      '#!/bin/sh\neval file=\\${$#}\nprintf "%s\\n" "$@" > "$file"\n',
+      'utf-8',
+    )
+    chmodSync(fakeNano, 0o755)
+
+    const result = await openPresetInEditor('original-content', fakeNano)
+
+    // The script wrote all args (including --syntax=json and the filepath) into the file
+    expect(result).toContain('--syntax=json')
+  })
 })
 
 describe('parsePresetJsonc', () => {

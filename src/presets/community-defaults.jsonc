@@ -1,5 +1,5 @@
 {
-  // Board manager settings — controls pagination, thread lifecycle, and auto-moderation
+  // 5chan Board manager settings — controls pagination, thread lifecycle, and auto-moderation
   "boardManagerSettings": {
     // Number of threads shown per page
     "perPage": 15,
@@ -7,9 +7,9 @@
     "pages": 10,
     // Max replies before a thread stops being bumped and gets archived
     "bumpLimit": 300,
-    // How long archived threads are kept before permanent deletion, in seconds (172800 = 48h)
+    // How long archived threads are kept before permanent deletion and purge, in seconds (172800 = 48h)
     "archivePurgeSeconds": 172800,
-    // Reason strings attached to automated moderation actions (visible in logs)
+    // Reason strings attached to automated moderation actions (visible in logs and web UI to users)
     "moderationReasons": {
       // Reason shown when a thread is archived because it fell past the last page
       "archiveCapacity": "5chan board manager: thread archived — exceeded board capacity",
@@ -18,11 +18,12 @@
       // Reason shown when an archived thread is permanently purged after retention expires
       "purgeArchived": "5chan board manager: thread purged — archive retention expired",
       // Reason shown when author-deleted content is purged
-      "purgeDeleted": "5chan board manager: content purged — author-deleted"
-    }
+      "purgeDeleted": "5chan board manager: content purged — author-deleted",
+    },
   },
 
-  // Community settings — applied directly to the subplebbit (plebbit community)
+  // Board options — applied directly to the board itself (Bitsocial community)
+  // for all options, look at https://github.com/plebbit/plebbit-js?tab=readme-ov-file#subplebbiteditsubplebbiteditoptions
   "boardSettings": {
     // Feature flags that control how users interact with the board
     "features": {
@@ -30,53 +31,76 @@
       "noUpvotes": true,
       // Disable downvoting
       "noDownvotes": true,
-      // New threads must include an image or media link
-      "requirePostLinkIsMedia": true,
       // New threads must include a link (URL)
       "requirePostLink": true,
-      // Replies must include a link (usually false for imageboards)
+      // Any new threads with link it has to be an image or media link
+      "requirePostLinkIsMedia": true,
+
+      // Replies don't need to include a link
       "requireReplyLink": false,
-      // "per-post" = each post gets a new anonymous identity, no persistent usernames
-      "pseudonymityMode": "per-post"
+
+      // If replies include link it has to be of image or media
+      "requireReplyLinkIsMedia": true,
+
+      // Authors get new address per thread (post), but inside the same thread they retain the same identity
+      "pseudonymityMode": "per-post",
     },
-    // Advanced subplebbit settings (challenges, etc.)
     "settings": {
       // Challenge rules that control anti-spam and captcha behavior.
       // Each entry defines a challenge with a "name", "description", and "exclude" rules.
       // Challenges are evaluated in order; the first match is presented to the user.
       // "exclude" rules define who is exempted (e.g., moderators, trusted users).
+
       "challenges": [
         {
+          // Brute-force gate.
+          // Authors who fail captcha 5+ times per hour get hard-rejected.
+          // The hard reject itself increments the failure counter, creating
+          // a progressive cooldown that keeps them locked out.
           "name": "fail",
           "description": "Blocks authors with excessive failed captcha attempts.",
           "options": {
-            "error": "Too many failed attempts. Try again later."
+            "error": "Too many failed attempts. Try again later.",
           },
           "exclude": [
+            // Mod bypass.
             { "role": ["moderator", "admin", "owner"] },
-            { "rateLimit": 5, "rateLimitChallengeSuccess": false }
-          ]
+
+            // Anyone under 5 failed attempts per hour is excluded (allowed through).
+            // Once failures hit 5/hr, this exclude stops matching and the fail
+            // challenge applies, hard-rejecting the author.
+            { "rateLimit": 5, "rateLimitChallengeSuccess": false },
+          ],
         },
         {
+          // CommentEdit policy gate.
+          // Reject non-mod comment edits.
           "name": "fail",
           "description": "Disables CommentEdit publications on this board.",
           "options": {
-            "error": "Comment edits are disabled on this board."
+            "error": "Comment edits are disabled on this board.",
           },
           "exclude": [
+            // Mod bypass.
             { "role": ["moderator", "admin", "owner"] },
+
+            // Exclude all non-commentEdit publication types.
+            // publicationType matching is OR, so this challenge applies only to commentEdit.
             {
               "publicationType": {
                 "post": true,
                 "reply": true,
                 "vote": true,
                 "commentModeration": true,
-                "subplebbitEdit": true
-              }
-            }
-          ]
+                "subplebbitEdit": true,
+              },
+            },
+          ],
         },
         {
+          // Post captcha gate.
+          // Untrusted users or trusted users exceeding rate limit must solve captcha
+          // and go to pending approval.
           "name": "captcha-canvas-v3",
           "description": "Post captcha for untrusted or rate-exceeded users.",
           "pendingApproval": true,
@@ -84,16 +108,35 @@
             "characters": "6",
             "width": "280",
             "height": "96",
-            "colors": "#2f9e44,#1c7ed6,#e8590c"
+            "colors": "#2f9e44,#1c7ed6,#e8590c",
           },
           "exclude": [
+            // Only for posts.
             { "publicationType": { "reply": true } },
+
+            // Mod bypass (no rate limit).
             { "role": ["moderator", "admin", "owner"] },
-            { "postCount": 10, "firstCommentTimestamp": 604800, "rateLimit": 3, "rateLimitChallengeSuccess": true },
-            { "replyCount": 20, "firstCommentTimestamp": 604800, "rateLimit": 3, "rateLimitChallengeSuccess": true }
-          ]
+
+            // Trusted bypass requires sustained activity + account age + under rate limit.
+            // If rate limit is exceeded, trust bypass stops matching and captcha+pending kicks in.
+            {
+              "postCount": 10,
+              "firstCommentTimestamp": 604800,
+              "rateLimit": 3,
+              "rateLimitChallengeSuccess": true,
+            },
+            {
+              "replyCount": 20,
+              "firstCommentTimestamp": 604800,
+              "rateLimit": 3,
+              "rateLimitChallengeSuccess": true,
+            },
+          ],
         },
         {
+          // Reply captcha gate.
+          // Untrusted users or trusted users exceeding rate limit must solve captcha;
+          // replies go to pending approval.
           "name": "captcha-canvas-v3",
           "description": "Reply captcha for untrusted or rate-exceeded users.",
           "pendingApproval": true,
@@ -101,16 +144,33 @@
             "characters": "5",
             "width": "260",
             "height": "90",
-            "colors": "#2f9e44,#1c7ed6,#e8590c"
+            "colors": "#2f9e44,#1c7ed6,#e8590c",
           },
           "exclude": [
+            // Only for replies.
             { "publicationType": { "post": true } },
+
+            // Mod bypass (no rate limit).
             { "role": ["moderator", "admin", "owner"] },
-            { "postCount": 10, "firstCommentTimestamp": 604800, "rateLimit": 6, "rateLimitChallengeSuccess": true },
-            { "replyCount": 20, "firstCommentTimestamp": 604800, "rateLimit": 6, "rateLimitChallengeSuccess": true }
-          ]
-        }
-      ]
-    }
-  }
+
+            // Trusted bypass requires activity + account age + under rate limit.
+            // Thresholds match post captcha since reply flooding via sybil accounts
+            // is the most practical spam vector.
+            {
+              "postCount": 10,
+              "firstCommentTimestamp": 604800,
+              "rateLimit": 6,
+              "rateLimitChallengeSuccess": true,
+            },
+            {
+              "replyCount": 20,
+              "firstCommentTimestamp": 604800,
+              "rateLimit": 6,
+              "rateLimitChallengeSuccess": true,
+            },
+          ],
+        },
+      ],
+    },
+  },
 }

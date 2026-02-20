@@ -465,6 +465,19 @@ Uses `plebbit-logger` (same logger as the plebbit-js ecosystem). Key events logg
 - Mod role auto-added
 - Errors
 
+**Docker:** Debug logging (`DEBUG=5chan:*`) is enabled by default in the Docker image, so `docker logs` shows the full plebbit-logger output. To silence it, override the variable:
+
+```bash
+docker run -e DEBUG= 5chan-board-manager
+```
+
+Or in `docker-compose.yml`:
+
+```yaml
+environment:
+  DEBUG: ""
+```
+
 ## 4chan Board Behavior Reference
 
 ### Board capacity

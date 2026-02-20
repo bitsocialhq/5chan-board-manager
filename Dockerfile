@@ -47,6 +47,7 @@ USER 5chan
 
 ENV XDG_DATA_HOME=/data
 ENV XDG_CONFIG_HOME=/data
+ENV DEBUG=5chan:*
 
 VOLUME ["/data"]
 

@@ -168,19 +168,19 @@ docker run -d -v /path/to/data:/data 5chan-board-manager
 
 If you are not using the Docker quick usage flow above, create the board with `bitsocial community create` first, then add it to 5chan with `5chan board add`.
 
-Run `5chan board add --help` for full details on preset defaults flags (`--apply-defaults`, `--skip-apply-defaults`, `--interactive-apply-defaults`). In interactive terminals, defaults are shown with an `[A]ccept / [M]odify / [S]kip` prompt; choosing Modify opens the preset in `$EDITOR`.
+Run `5chan board add --help` for full details on preset defaults flags (`--apply-defaults`, `--skip-apply-defaults`, `--interactive-apply-defaults`). In interactive terminals, defaults are shown with an `[A]ccept / [M]odify / [S]kip` prompt; choosing Modify opens the preset in `$EDITOR` as an annotated JSONC file with `//` comments explaining each field.
 
-Preset JSON is validated with Zod.
+Preset JSONC is validated with Zod. Both plain JSON and JSONC (with `//` comments) are accepted as preset files.
 
 `boardSettings` must follow plebbit-js `SubplebbitEditOptions`:
 https://github.com/plebbit/plebbit-js?tab=readme-ov-file#subplebbiteditoptions
 
-Bundled preset JSON defaults:
-[`src/presets/community-defaults.json`](src/presets/community-defaults.json)
+Bundled preset JSONC defaults:
+[`src/presets/community-defaults.jsonc`](src/presets/community-defaults.jsonc)
 
 `boardSettings` is merged into `subplebbit.edit()` with "missing only" semantics (only absent values are applied). `boardManagerSettings` is used as default values for `board add` config fields, and explicit CLI flags override these defaults.
 
-The bundled preset file is `src/presets/community-defaults.json`.
+The bundled preset file is `src/presets/community-defaults.jsonc`.
 
 ## Commands
 

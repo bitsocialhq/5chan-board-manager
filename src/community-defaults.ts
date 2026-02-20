@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import stripJsonComments from 'strip-json-comments'
 import { z } from 'zod'
 import type { Subplebbit } from './types.js'
 
@@ -42,7 +43,7 @@ export interface ApplyCommunityDefaultsResult {
 }
 
 const COMMUNITY_DEFAULTS_PRESET_PATH = fileURLToPath(
-  new URL('./presets/community-defaults.json', import.meta.url),
+  new URL('./presets/community-defaults.jsonc', import.meta.url),
 )
 const require = createRequire(import.meta.url)
 let parseSubplebbitEditOptionsPromise: Promise<ParseSubplebbitEditOptionsFn> | undefined
@@ -109,7 +110,7 @@ export async function loadCommunityDefaultsPreset(
 
   let parsed: unknown
   try {
-    parsed = JSON.parse(raw)
+    parsed = JSON.parse(stripJsonComments(raw))
   } catch (err) {
     throw new Error(
       `Invalid JSON in community defaults preset "${presetPath}": ${(err as Error).message}`,
@@ -137,6 +138,11 @@ export async function loadCommunityDefaultsPreset(
     boardSettings,
     boardManagerSettings: baseResult.data.boardManagerSettings,
   }
+}
+
+export function loadCommunityDefaultsPresetRaw(presetPath?: string): string {
+  const resolvedPath = presetPath ?? COMMUNITY_DEFAULTS_PRESET_PATH
+  return readFileSync(resolvedPath, 'utf-8')
 }
 
 export async function getCommunityDefaultsPreset(): Promise<CommunityDefaultsPreset> {

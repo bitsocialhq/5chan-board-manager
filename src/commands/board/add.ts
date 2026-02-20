@@ -11,10 +11,11 @@ import {
   getCommunityDefaultsPreset,
   getParseSubplebbitEditOptions,
   loadCommunityDefaultsPreset,
+  loadCommunityDefaultsPresetRaw,
 } from '../../community-defaults.js'
 import type { CommunityDefaultsPreset } from '../../community-defaults.js'
 import type { BoardConfig } from '../../types.js'
-import { flattenPreset, formatPresetDisplay, openPresetInEditor } from '../../preset-editor.js'
+import { flattenPreset, formatPresetDisplay, openPresetInEditor, parsePresetJsonc } from '../../preset-editor.js'
 
 type ApplyDefaultsDecision = 'apply' | 'skip' | 'interactive'
 
@@ -125,6 +126,7 @@ https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address`
   protected async promptInteractiveDefaults(
     address: string,
     preset: CommunityDefaultsPreset,
+    rawJsonc: string,
   ): Promise<CommunityDefaultsPreset | 'skip'> {
     const entries = flattenPreset(preset)
     const display = formatPresetDisplay(address, entries)
@@ -142,7 +144,7 @@ https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address`
         if (answer === 's' || answer === 'skip') return 'skip'
         if (answer === 'm' || answer === 'modify') {
           rl.close()
-          return this.openAndValidatePreset(preset)
+          return this.openAndValidatePreset(rawJsonc)
         }
 
         this.log('Please answer "a", "m", or "s".')
@@ -153,13 +155,13 @@ https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address`
   }
 
   protected async openAndValidatePreset(
-    preset: CommunityDefaultsPreset,
+    rawJsonc: string,
   ): Promise<CommunityDefaultsPreset> {
-    const rawContent = await openPresetInEditor(preset)
+    const rawContent = await openPresetInEditor(rawJsonc)
 
     let parsed: unknown
     try {
-      parsed = JSON.parse(rawContent)
+      parsed = parsePresetJsonc(rawContent)
     } catch (err) {
       this.error(`Invalid JSON in edited preset: ${(err as Error).message}`)
     }
@@ -217,6 +219,9 @@ https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address`
       this.error(`Board "${args.address}" already exists in config`)
     }
 
+    const basePresetRaw = loadCommunityDefaultsPresetRaw(
+      flags['defaults-preset'] ?? undefined,
+    )
     const basePreset = flags['defaults-preset']
       ? await loadCommunityDefaultsPreset(flags['defaults-preset'])
       : await getCommunityDefaultsPreset()
@@ -232,7 +237,7 @@ https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address`
     if (decision === 'apply') {
       preset = basePreset
     } else if (decision === 'interactive') {
-      const result = await this.promptInteractiveDefaults(args.address, basePreset)
+      const result = await this.promptInteractiveDefaults(args.address, basePreset, basePresetRaw)
       preset = result === 'skip' ? undefined : result
     }
 

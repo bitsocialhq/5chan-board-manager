@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import { mkdtempSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { platform, tmpdir } from 'node:os'
+import stripJsonComments from 'strip-json-comments'
 import type { CommunityDefaultsPreset } from './community-defaults.js'
 
 export interface FlatPresetEntry {
@@ -101,16 +102,16 @@ export function resolveEditor(): string {
   return platform() === 'win32' ? 'notepad' : 'vi'
 }
 
-/** Open a preset JSON in the user's editor and return the raw edited content. */
+/** Open a preset JSONC in the user's editor and return the raw edited content. */
 export function openPresetInEditor(
-  preset: CommunityDefaultsPreset,
+  rawJsonc: string,
   editorCommand?: string,
 ): Promise<string> {
   const editor = editorCommand ?? resolveEditor()
   const dir = mkdtempSync(join(tmpdir(), '5chan-preset-'))
-  const filePath = join(dir, 'preset.json')
+  const filePath = join(dir, 'preset.jsonc')
 
-  writeFileSync(filePath, JSON.stringify(preset, null, 2) + '\n', 'utf-8')
+  writeFileSync(filePath, rawJsonc, 'utf-8')
 
   return new Promise<string>((resolve, reject) => {
     const parts = editor.split(/\s+/)
@@ -144,6 +145,11 @@ export function openPresetInEditor(
       resolve(content)
     })
   })
+}
+
+/** Strip JSONC comments and parse. Works with both plain JSON and JSONC. */
+export function parsePresetJsonc(rawContent: string): unknown {
+  return JSON.parse(stripJsonComments(rawContent))
 }
 
 function cleanup(filePath: string): void {

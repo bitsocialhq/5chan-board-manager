@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
-import { flattenPreset, formatPresetDisplay, resolveEditor, openPresetInEditor } from './preset-editor.js'
+import { flattenPreset, formatPresetDisplay, resolveEditor, openPresetInEditor, parsePresetJsonc } from './preset-editor.js'
 import type { FlatPresetEntry } from './preset-editor.js'
 import type { CommunityDefaultsPreset } from './community-defaults.js'
 
@@ -197,37 +197,63 @@ describe('openPresetInEditor', () => {
     vi.restoreAllMocks()
   })
 
-  it('writes preset JSON to temp file and returns edited content', async () => {
-    // Use 'cat' as the "editor" — it just outputs the file, leaving it unchanged
-    const preset: CommunityDefaultsPreset = {
-      boardSettings: { features: { noUpvotes: true } },
-      boardManagerSettings: { perPage: 15 },
-    }
+  it('writes raw JSONC to temp file and returns edited content', async () => {
+    const rawJsonc = '// comment\n{"boardSettings": {"features": {"noUpvotes": true}}, "boardManagerSettings": {"perPage": 15}}\n'
 
     // Use a no-op "editor" that doesn't modify the file (true command)
-    const result = await openPresetInEditor(preset, 'true')
-    const parsed = JSON.parse(result)
+    const result = await openPresetInEditor(rawJsonc, 'true')
 
-    expect(parsed).toEqual(preset)
+    expect(result).toBe(rawJsonc)
+    const parsed = parsePresetJsonc(result)
+    expect(parsed).toEqual({
+      boardSettings: { features: { noUpvotes: true } },
+      boardManagerSettings: { perPage: 15 },
+    })
   })
 
   it('throws when editor command fails', async () => {
-    const preset: CommunityDefaultsPreset = {
-      boardSettings: {},
-      boardManagerSettings: {},
-    }
-
-    await expect(openPresetInEditor(preset, 'false')).rejects.toThrow('Editor exited with code 1')
+    await expect(openPresetInEditor('{}', 'false')).rejects.toThrow('Editor exited with code 1')
   })
 
   it('throws when editor command is not found', async () => {
-    const preset: CommunityDefaultsPreset = {
-      boardSettings: {},
-      boardManagerSettings: {},
-    }
-
     await expect(
-      openPresetInEditor(preset, 'nonexistent-editor-command-xyz'),
+      openPresetInEditor('{}', 'nonexistent-editor-command-xyz'),
     ).rejects.toThrow('Failed to launch editor')
+  })
+})
+
+describe('parsePresetJsonc', () => {
+  it('parses plain JSON', () => {
+    const result = parsePresetJsonc('{"key": "value"}')
+    expect(result).toEqual({ key: 'value' })
+  })
+
+  it('strips single-line // comments', () => {
+    const jsonc = `{
+      // this is a comment
+      "key": "value"
+    }`
+    const result = parsePresetJsonc(jsonc)
+    expect(result).toEqual({ key: 'value' })
+  })
+
+  it('strips inline comments', () => {
+    const jsonc = '{"key": "value" // inline comment\n}'
+    const result = parsePresetJsonc(jsonc)
+    expect(result).toEqual({ key: 'value' })
+  })
+
+  it('throws on invalid JSON after stripping comments', () => {
+    expect(() => parsePresetJsonc('// comment\n{bad json')).toThrow()
+  })
+
+  it('round-trips JSONC content through editor', async () => {
+    const rawJsonc = '// Board preset\n{\n  // A comment\n  "boardSettings": {},\n  "boardManagerSettings": {}\n}\n'
+
+    // 'true' is a no-op editor
+    const editedContent = await openPresetInEditor(rawJsonc, 'true')
+    const parsed = parsePresetJsonc(editedContent)
+
+    expect(parsed).toEqual({ boardSettings: {}, boardManagerSettings: {} })
   })
 })

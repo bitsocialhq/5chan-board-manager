@@ -15,12 +15,14 @@ vi.mock('../../community-defaults.js', () => ({
   getCommunityDefaultsPreset: vi.fn(),
   getParseSubplebbitEditOptions: vi.fn(),
   loadCommunityDefaultsPreset: vi.fn(),
+  loadCommunityDefaultsPresetRaw: vi.fn(() => '{}'),
 }))
 
 vi.mock('../../preset-editor.js', () => ({
   flattenPreset: vi.fn(() => []),
   formatPresetDisplay: vi.fn(() => 'Preset defaults for "mock":'),
   openPresetInEditor: vi.fn(),
+  parsePresetJsonc: vi.fn((raw: string) => JSON.parse(raw)),
 }))
 
 import { validateBoardAddress } from '../../board-validator.js'
@@ -86,9 +88,10 @@ async function runCommand(
     stderr += String(warnArgs[0]) + '\n'
   }) as typeof cmd.warn
   ;(cmd as unknown as { isInteractive: () => boolean }).isInteractive = () => options.interactive ?? true
-  ;(cmd as unknown as { promptInteractiveDefaults: (address: string, preset: CommunityDefaultsPreset) => Promise<CommunityDefaultsPreset | 'skip'> }).promptInteractiveDefaults = async (
+  ;(cmd as unknown as { promptInteractiveDefaults: (address: string, preset: CommunityDefaultsPreset, rawJsonc: string) => Promise<CommunityDefaultsPreset | 'skip'> }).promptInteractiveDefaults = async (
     _address: string,
     preset: CommunityDefaultsPreset,
+    _rawJsonc: string,
   ) => options.interactiveResult ?? preset
 
   await cmd.run()

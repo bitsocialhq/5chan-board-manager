@@ -13,6 +13,7 @@ import {
   buildCommunityDefaultsPatch,
   buildMissingObjectPatch,
   loadCommunityDefaultsPreset,
+  loadCommunityDefaultsPresetRaw,
   setParseSubplebbitEditOptionsOverrideForTests,
 } from './community-defaults.js'
 import type { PlebbitInstance, Subplebbit } from './types.js'
@@ -89,12 +90,43 @@ describe('community defaults preset loading', () => {
     expect(preset.boardManagerSettings.perPage).toBe(15)
   })
 
+  it('loads a valid preset jsonc file with comments', async () => {
+    const dir = tmpDir()
+    const presetPath = join(dir, 'preset.jsonc')
+    writeFileSync(presetPath, [
+      '{',
+      '  // Board settings comment',
+      '  "boardSettings": {',
+      '    "features": { "noUpvotes": true }',
+      '  },',
+      '  "boardManagerSettings": {',
+      '    "perPage": 20 // inline comment',
+      '  }',
+      '}',
+    ].join('\n'))
+
+    const preset = await loadCommunityDefaultsPreset(presetPath)
+    expect(preset.boardSettings.features?.noUpvotes).toBe(true)
+    expect(preset.boardManagerSettings.perPage).toBe(20)
+  })
+
   it('throws when preset json is invalid', async () => {
     const dir = tmpDir()
     const presetPath = join(dir, 'bad.json')
     writeFileSync(presetPath, '{bad json')
 
     await expect(loadCommunityDefaultsPreset(presetPath)).rejects.toThrow('Invalid JSON')
+  })
+
+  it('loadCommunityDefaultsPresetRaw returns raw string with comments', () => {
+    const dir = tmpDir()
+    const presetPath = join(dir, 'preset.jsonc')
+    const content = '// comment\n{"boardSettings": {}, "boardManagerSettings": {}}\n'
+    writeFileSync(presetPath, content)
+
+    const raw = loadCommunityDefaultsPresetRaw(presetPath)
+    expect(raw).toBe(content)
+    expect(raw).toContain('//')
   })
 
   it('throws when preset has invalid pseudonymity mode', async () => {

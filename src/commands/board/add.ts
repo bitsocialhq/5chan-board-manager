@@ -2,6 +2,7 @@ import { Args, Command, Flags } from '@oclif/core'
 import { createInterface } from 'node:readline/promises'
 import { loadConfig, saveBoardConfig } from '../../config-manager.js'
 import { validateBoardAddress } from '../../board-validator.js'
+import { isNonExistentFlagsError } from '../../parse-utils.js'
 import {
   applyCommunityDefaultsToBoard,
   BoardManagerSettingsSchema,
@@ -20,7 +21,7 @@ type ApplyDefaultsDecision = 'apply' | 'skip' | 'interactive'
 export default class BoardAdd extends Command {
   static override args = {
     address: Args.string({
-      description: 'Subplebbit address to add',
+      description: 'Board address to add',
       required: true,
     }),
   }
@@ -35,7 +36,11 @@ Preset defaults behavior:
   Non-interactive (no flags)    Errors; requires --apply-defaults or --skip-apply-defaults
 
 When choosing [M]odify, the preset opens in your editor ($VISUAL > $EDITOR > vi/notepad).
-Modified presets are validated before applying; invalid changes fail the command.`
+Modified presets are validated before applying; invalid changes fail the command.
+
+Note: "board add" only accepts 5chan settings flags (pagination, bump limits, archiving).
+To set board settings (title, description, rules, etc.), use a WebUI or bitsocial-cli:
+https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address`
 
   static override examples = [
     '5chan board add random.eth',
@@ -182,8 +187,26 @@ Modified presets are validated before applying; invalid changes fail the command
     }
   }
 
+  private async parseWithUnknownFlagCheck() {
+    try {
+      return await this.parse(BoardAdd)
+    } catch (err) {
+      if (isNonExistentFlagsError(err)) {
+        this.error(
+          `Unknown option${err.flags.length === 1 ? '' : 's'}: ${err.flags.join(', ')}\n\n` +
+          '"board add" only manages 5chan settings (pagination, bump limits, archiving).\n' +
+          'Valid flags: --per-page, --pages, --bump-limit, --archive-purge-seconds,\n' +
+          '  --apply-defaults, --skip-apply-defaults, --interactive-apply-defaults, --defaults-preset, --rpc-url\n\n' +
+          'To set board settings (title, description, rules, etc.), use a WebUI or bitsocial-cli:\n' +
+          'https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address'
+        )
+      }
+      throw err
+    }
+  }
+
   async run(): Promise<void> {
-    const { args, flags } = await this.parse(BoardAdd)
+    const { args, flags } = await this.parseWithUnknownFlagCheck()
     const configDir = this.config.configDir
 
     await validateBoardAddress(args.address, flags['rpc-url'])

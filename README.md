@@ -203,7 +203,7 @@ USAGE
     [--defaults-preset <value>]
 
 ARGUMENTS
-  ADDRESS  Subplebbit address to add
+  ADDRESS  Board address to add
 
 FLAGS
   --apply-defaults                 Apply preset defaults silently (no prompts)
@@ -221,14 +221,18 @@ DESCRIPTION
   Add a board to the config
 
   Preset defaults behavior:
-    --apply-defaults              Apply all preset defaults silently (no prompts)
-    --skip-apply-defaults         Skip preset defaults silently
-    --interactive-apply-defaults  Review defaults, accept all, modify in $EDITOR, or skip (requires TTY)
-    Interactive TTY (no flags)    Same as --interactive-apply-defaults: shows [A]ccept / [M]odify / [S]kip
-    Non-interactive (no flags)    Errors; requires --apply-defaults or --skip-apply-defaults
+  --apply-defaults              Apply all preset defaults silently (no prompts)
+  --skip-apply-defaults         Skip preset defaults silently
+  --interactive-apply-defaults  Review defaults, accept all, modify in $EDITOR, or skip (requires TTY)
+  Interactive TTY (no flags)    Same as --interactive-apply-defaults: shows [A]ccept / [M]odify / [S]kip
+  Non-interactive (no flags)    Errors; requires --apply-defaults or --skip-apply-defaults
 
   When choosing [M]odify, the preset opens in your editor ($VISUAL > $EDITOR > vi/notepad).
   Modified presets are validated before applying; invalid changes fail the command.
+
+  Note: "board add" only accepts 5chan settings flags (pagination, bump limits, archiving).
+  To set board settings (title, description, rules, etc.), use a WebUI or bitsocial-cli:
+  https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address
 
 EXAMPLES
   $ 5chan board add random.eth
@@ -252,7 +256,7 @@ _See code: [src/commands/board/add.ts](https://github.com/bitsocialhq/5chan-boar
 
 ## `5chan board edit ADDRESS`
 
-Edit config for an existing board
+Edit 5chan settings for an existing board
 
 ```
 USAGE
@@ -268,10 +272,14 @@ FLAGS
   --pages=<value>                  Number of pages
   --per-page=<value>               Posts per page
   --reset=<value>                  Comma-separated fields to reset to defaults (per-page, pages, bump-limit,
-                                   archive-purge-seconds)
+                                   archive-purge-seconds, moderation-reasons)
 
 DESCRIPTION
-  Edit config for an existing board
+  Edit 5chan settings for an existing board
+
+  This command configures how 5chan manages the board (pagination, bump limits, archiving).
+  To edit board settings (title, description, rules, etc.), use a WebUI or bitsocial-cli:
+  https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address
 
 EXAMPLES
   $ 5chan board edit tech.eth --bump-limit 500
@@ -281,6 +289,8 @@ EXAMPLES
   $ 5chan board edit random.eth --reset per-page,bump-limit
 
   $ 5chan board edit random.eth --per-page 20 --reset bump-limit
+
+  $ 5chan board edit random.eth --reset moderation-reasons
 ```
 
 _See code: [src/commands/board/edit.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.0/src/commands/board/edit.ts)_
@@ -311,7 +321,7 @@ USAGE
   $ 5chan board remove ADDRESS
 
 ARGUMENTS
-  ADDRESS  Board address to remove
+  ADDRESS  Subplebbit address to remove
 
 DESCRIPTION
   Remove a board from the config

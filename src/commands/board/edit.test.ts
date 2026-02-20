@@ -135,4 +135,32 @@ describe('board edit command', () => {
     const { stdout } = await runCommand(['a.eth', '--bump-limit', '500'], dir)
     expect(stdout).toContain('Updated board "a.eth"')
   })
+
+  it('throws descriptive error for unknown flag', async () => {
+    const dir = tmpDir()
+    writeBoardConfig(dir, { address: 'a.eth' })
+
+    await expect(runCommand(['a.eth', '--title', 'My Board'], dir)).rejects.toThrow('Unknown option: --title')
+  })
+
+  it('mentions bitsocial-cli in unknown flag error', async () => {
+    const dir = tmpDir()
+    writeBoardConfig(dir, { address: 'a.eth' })
+
+    await expect(runCommand(['a.eth', '--title', 'My Board'], dir)).rejects.toThrow('bitsocial-cli')
+  })
+
+  it('lists valid flags in unknown flag error', async () => {
+    const dir = tmpDir()
+    writeBoardConfig(dir, { address: 'a.eth' })
+
+    await expect(runCommand(['a.eth', '--title', 'My Board'], dir)).rejects.toThrow('--per-page')
+  })
+
+  it('mentions 5chan settings in unknown flag error', async () => {
+    const dir = tmpDir()
+    writeBoardConfig(dir, { address: 'a.eth' })
+
+    await expect(runCommand(['a.eth', '--title', 'My Board'], dir)).rejects.toThrow('5chan settings')
+  })
 })

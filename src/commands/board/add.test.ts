@@ -379,4 +379,22 @@ describe('board add command', () => {
 
     expect(existsSync(join(dir, 'boards', 'my-board.eth.json'))).toBe(true)
   })
+
+  it('throws descriptive error for unknown flag', async () => {
+    const dir = tmpDir()
+
+    await expect(runCommand(['new.eth', '--title', 'My Board'], dir)).rejects.toThrow('Unknown option: --title')
+  })
+
+  it('mentions bitsocial-cli in unknown flag error', async () => {
+    const dir = tmpDir()
+
+    await expect(runCommand(['new.eth', '--title', 'My Board'], dir)).rejects.toThrow('bitsocial-cli')
+  })
+
+  it('mentions 5chan settings in unknown flag error', async () => {
+    const dir = tmpDir()
+
+    await expect(runCommand(['new.eth', '--title', 'My Board'], dir)).rejects.toThrow('5chan settings')
+  })
 })

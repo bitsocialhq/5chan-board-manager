@@ -1,5 +1,6 @@
 import { Args, Command, Flags } from '@oclif/core'
 import { loadBoardConfig, boardConfigPath, saveBoardConfig, updateBoardConfig } from '../../config-manager.js'
+import { isNonExistentFlagsError } from '../../parse-utils.js'
 import type { BoardConfig } from '../../types.js'
 
 /** Maps kebab-case CLI flag names to camelCase BoardConfig field names */
@@ -14,12 +15,16 @@ const RESETTABLE_FIELDS: Record<string, keyof Omit<BoardConfig, 'address'>> = {
 export default class BoardEdit extends Command {
   static override args = {
     address: Args.string({
-      description: 'Subplebbit address to edit',
+      description: 'Board address to edit',
       required: true,
     }),
   }
 
-  static override description = 'Edit config for an existing board'
+  static override description = `Edit 5chan settings for an existing board
+
+This command configures how 5chan manages the board (pagination, bump limits, archiving).
+To edit board settings (title, description, rules, etc.), use a WebUI or bitsocial-cli:
+https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address`
 
   static override examples = [
     '5chan board edit tech.eth --bump-limit 500',
@@ -47,8 +52,25 @@ export default class BoardEdit extends Command {
     }),
   }
 
+  private async parseWithUnknownFlagCheck() {
+    try {
+      return await this.parse(BoardEdit)
+    } catch (err) {
+      if (isNonExistentFlagsError(err)) {
+        this.error(
+          `Unknown option${err.flags.length === 1 ? '' : 's'}: ${err.flags.join(', ')}\n\n` +
+          '"board edit" only manages 5chan settings (pagination, bump limits, archiving).\n' +
+          'Valid flags: --per-page, --pages, --bump-limit, --archive-purge-seconds, --reset\n\n' +
+          'To edit board settings (title, description, rules, etc.), use a WebUI or bitsocial-cli:\n' +
+          'https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address'
+        )
+      }
+      throw err
+    }
+  }
+
   async run(): Promise<void> {
-    const { args, flags } = await this.parse(BoardEdit)
+    const { args, flags } = await this.parseWithUnknownFlagCheck()
     const configDir = this.config.configDir
 
     const updates: Partial<Omit<BoardConfig, 'address'>> = {}

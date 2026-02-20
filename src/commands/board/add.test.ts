@@ -205,6 +205,31 @@ describe('board add command', () => {
     }))
 
     await expect(runCommand(['dup.eth'], dir)).rejects.toThrow('already exists')
+    expect(mockApplyDefaults).not.toHaveBeenCalled()
+  })
+
+  it('duplicate check runs before interactive prompt', async () => {
+    const dir = tmpDir()
+    const configPath = join(dir, 'config.json')
+    writeFileSync(configPath, JSON.stringify({
+      boards: [{ address: 'dup.eth' }],
+    }))
+
+    const promptSpy = vi.fn()
+    const cmd = new BoardAdd(['dup.eth'], {} as never)
+    Object.defineProperty(cmd, 'config', {
+      value: {
+        configDir: dir,
+        runHook: async () => ({ successes: [], failures: [] }),
+      },
+    })
+    cmd.log = () => {}
+    ;(cmd as unknown as { isInteractive: () => boolean }).isInteractive = () => true
+    ;(cmd as unknown as { promptInteractiveDefaults: typeof promptSpy }).promptInteractiveDefaults = promptSpy
+
+    await expect(cmd.run()).rejects.toThrow('already exists')
+    expect(promptSpy).not.toHaveBeenCalled()
+    expect(mockGetPreset).not.toHaveBeenCalled()
   })
 
   it('errors when both apply and skip flags are provided', async () => {

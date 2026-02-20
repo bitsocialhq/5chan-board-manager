@@ -189,6 +189,12 @@ Modified presets are validated before applying; invalid changes fail the command
 
     await validateBoardAddress(args.address, flags['rpc-url'])
 
+    // Early duplicate check — fail before interactive prompts or RPC edits
+    let config = loadConfig(configPath)
+    if (config.boards.some((b) => b.address === args.address)) {
+      this.error(`Board "${args.address}" already exists in config`)
+    }
+
     const basePreset = flags['defaults-preset']
       ? await loadCommunityDefaultsPreset(flags['defaults-preset'])
       : await getCommunityDefaultsPreset()
@@ -220,8 +226,6 @@ Modified presets are validated before applying; invalid changes fail the command
     } else {
       this.log(`Skipped applying preset defaults to "${args.address}"`)
     }
-
-    let config = loadConfig(configPath)
 
     const board: BoardConfig = { address: args.address }
     if (preset) {

@@ -18,6 +18,13 @@ export type Page = Awaited<ReturnType<Subplebbit['posts']['getPage']>>
 /** A comment/thread within a page */
 export type ThreadComment = Page['comments'][number]
 
+export interface ModerationReasons {
+  archiveCapacity?: string
+  archiveBumpLimit?: string
+  purgeArchived?: string
+  purgeDeleted?: string
+}
+
 export interface BoardManagerOptions {
   subplebbitAddress: string
   plebbitRpcUrl: string
@@ -26,6 +33,7 @@ export interface BoardManagerOptions {
   pages?: number
   bumpLimit?: number
   archivePurgeSeconds?: number
+  moderationReasons?: ModerationReasons
 }
 
 export interface BoardManagerResult {
@@ -57,6 +65,7 @@ export interface BoardConfig {
   pages?: number
   bumpLimit?: number
   archivePurgeSeconds?: number
+  moderationReasons?: ModerationReasons
 }
 
 /** Default settings applied to all boards unless overridden per-board */
@@ -65,6 +74,7 @@ export interface BoardDefaults {
   pages?: number
   bumpLimit?: number
   archivePurgeSeconds?: number
+  moderationReasons?: ModerationReasons
 }
 
 /** Top-level multi-board JSON config */

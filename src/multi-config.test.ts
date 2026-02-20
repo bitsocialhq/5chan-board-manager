@@ -177,6 +177,49 @@ describe('loadMultiConfig', () => {
     })
     expect(() => loadMultiConfig(path)).toThrow('"defaults" must be an object')
   })
+
+  it('loads config with moderationReasons in defaults', () => {
+    const dir = tmpDir()
+    const path = writeConfig(dir, {
+      defaults: { moderationReasons: { archiveCapacity: 'custom' } },
+      boards: [{ address: 'x.eth' }],
+    })
+    const config = loadMultiConfig(path)
+    expect(config.defaults?.moderationReasons?.archiveCapacity).toBe('custom')
+  })
+
+  it('loads config with moderationReasons on a board', () => {
+    const dir = tmpDir()
+    const path = writeConfig(dir, {
+      boards: [{ address: 'x.eth', moderationReasons: { purgeDeleted: 'board reason' } }],
+    })
+    const config = loadMultiConfig(path)
+    expect(config.boards[0].moderationReasons?.purgeDeleted).toBe('board reason')
+  })
+
+  it('rejects non-object moderationReasons', () => {
+    const dir = tmpDir()
+    const path = writeConfig(dir, {
+      boards: [{ address: 'x.eth', moderationReasons: 'bad' }],
+    })
+    expect(() => loadMultiConfig(path)).toThrow('boards[0].moderationReasons must be an object')
+  })
+
+  it('rejects unknown keys in moderationReasons', () => {
+    const dir = tmpDir()
+    const path = writeConfig(dir, {
+      boards: [{ address: 'x.eth', moderationReasons: { unknownKey: 'val' } }],
+    })
+    expect(() => loadMultiConfig(path)).toThrow('boards[0].moderationReasons has unknown key "unknownKey"')
+  })
+
+  it('rejects non-string values in moderationReasons', () => {
+    const dir = tmpDir()
+    const path = writeConfig(dir, {
+      boards: [{ address: 'x.eth', moderationReasons: { archiveCapacity: 123 } }],
+    })
+    expect(() => loadMultiConfig(path)).toThrow('boards[0].moderationReasons.archiveCapacity must be a string')
+  })
 })
 
 describe('resolveBoardManagerOptions', () => {
@@ -255,5 +298,31 @@ describe('resolveBoardManagerOptions', () => {
     const config: MultiBoardConfig = { boards: [board] }
     const opts = resolveBoardManagerOptions(board, config)
     expect(opts.subplebbitAddress).toBe('my-board.eth')
+  })
+
+  it('merges moderationReasons per-field: board overrides default', () => {
+    const board: BoardConfig = {
+      address: 'a.eth',
+      moderationReasons: { archiveCapacity: 'board override' },
+    }
+    const config: MultiBoardConfig = {
+      defaults: {
+        moderationReasons: {
+          archiveCapacity: 'default capacity',
+          archiveBumpLimit: 'default bump',
+        },
+      },
+      boards: [board],
+    }
+    const opts = resolveBoardManagerOptions(board, config)
+    expect(opts.moderationReasons?.archiveCapacity).toBe('board override')
+    expect(opts.moderationReasons?.archiveBumpLimit).toBe('default bump')
+  })
+
+  it('returns undefined moderationReasons when neither board nor defaults set it', () => {
+    const board: BoardConfig = { address: 'a.eth' }
+    const config: MultiBoardConfig = { boards: [board] }
+    const opts = resolveBoardManagerOptions(board, config)
+    expect(opts.moderationReasons).toBeUndefined()
   })
 })

@@ -121,6 +121,24 @@ describe('community defaults preset loading', () => {
 
     await expect(loadCommunityDefaultsPreset(presetPath)).rejects.toThrow('Unrecognized key: "title"')
   })
+
+  it('loads preset with moderationReasons in boardManagerSettings', async () => {
+    const dir = tmpDir()
+    const presetPath = join(dir, 'preset.json')
+    writeFileSync(presetPath, JSON.stringify({
+      boardSettings: {},
+      boardManagerSettings: {
+        moderationReasons: {
+          archiveCapacity: 'custom capacity',
+          purgeDeleted: 'custom purge',
+        },
+      },
+    }))
+
+    const preset = await loadCommunityDefaultsPreset(presetPath)
+    expect(preset.boardManagerSettings.moderationReasons?.archiveCapacity).toBe('custom capacity')
+    expect(preset.boardManagerSettings.moderationReasons?.purgeDeleted).toBe('custom purge')
+  })
 })
 
 describe('buildMissingObjectPatch', () => {

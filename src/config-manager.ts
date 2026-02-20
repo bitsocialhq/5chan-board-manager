@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, mkdirSync, renameSync, unlinkSync } from 'node:fs'
 import { dirname } from 'node:path'
-import type { BoardConfig, MultiBoardConfig } from './types.js'
+import type { BoardConfig, ModerationReasons, MultiBoardConfig } from './types.js'
 
 /**
  * Load a config file from disk.
@@ -48,6 +48,7 @@ export function loadConfig(configPath: string): MultiBoardConfig {
       throw new Error(`Config file "${configPath}": "defaults" must be an object`)
     }
     validateNumericFields(config.defaults as Record<string, unknown>, 'defaults', configPath)
+    validateModerationReasons(config.defaults as Record<string, unknown>, 'defaults', configPath)
   }
 
   const boards = (config.boards ?? []) as unknown[]
@@ -65,6 +66,7 @@ export function loadConfig(configPath: string): MultiBoardConfig {
     }
     seen.add(board.address)
     validateNumericFields(board, `boards[${i}]`, configPath)
+    validateModerationReasons(board, `boards[${i}]`, configPath)
   }
 
   // Ensure boards key exists even if missing from file
@@ -82,6 +84,25 @@ function validateNumericFields(obj: Record<string, unknown>, prefix: string, con
       if (typeof obj[key] !== 'number' || !Number.isInteger(obj[key]) || (obj[key] as number) <= 0) {
         throw new Error(`Config file "${configPath}": ${prefix}.${key} must be a positive integer`)
       }
+    }
+  }
+}
+
+const MODERATION_REASONS_KEYS = ['archiveCapacity', 'archiveBumpLimit', 'purgeArchived', 'purgeDeleted'] as const
+
+function validateModerationReasons(obj: Record<string, unknown>, prefix: string, configPath: string): void {
+  if (obj.moderationReasons === undefined) return
+  if (typeof obj.moderationReasons !== 'object' || obj.moderationReasons === null || Array.isArray(obj.moderationReasons)) {
+    throw new Error(`Config file "${configPath}": ${prefix}.moderationReasons must be an object`)
+  }
+  const reasons = obj.moderationReasons as Record<string, unknown>
+  const allowed = new Set<string>(MODERATION_REASONS_KEYS)
+  for (const key of Object.keys(reasons)) {
+    if (!allowed.has(key)) {
+      throw new Error(`Config file "${configPath}": ${prefix}.moderationReasons has unknown key "${key}"`)
+    }
+    if (typeof reasons[key] !== 'string') {
+      throw new Error(`Config file "${configPath}": ${prefix}.moderationReasons.${key} must be a string`)
     }
   }
 }
@@ -168,12 +189,22 @@ export function updateBoard(
   }
 }
 
+function moderationReasonsChanged(a: ModerationReasons | undefined, b: ModerationReasons | undefined): boolean {
+  return (
+    a?.archiveCapacity !== b?.archiveCapacity ||
+    a?.archiveBumpLimit !== b?.archiveBumpLimit ||
+    a?.purgeArchived !== b?.purgeArchived ||
+    a?.purgeDeleted !== b?.purgeDeleted
+  )
+}
+
 function boardConfigChanged(a: BoardConfig, b: BoardConfig): boolean {
   return (
     a.perPage !== b.perPage ||
     a.pages !== b.pages ||
     a.bumpLimit !== b.bumpLimit ||
-    a.archivePurgeSeconds !== b.archivePurgeSeconds
+    a.archivePurgeSeconds !== b.archivePurgeSeconds ||
+    moderationReasonsChanged(a.moderationReasons, b.moderationReasons)
   )
 }
 

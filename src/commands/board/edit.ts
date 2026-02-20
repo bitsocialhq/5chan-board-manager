@@ -9,6 +9,7 @@ const RESETTABLE_FIELDS: Record<string, keyof Omit<BoardConfig, 'address'>> = {
   'pages': 'pages',
   'bump-limit': 'bumpLimit',
   'archive-purge-seconds': 'archivePurgeSeconds',
+  'moderation-reasons': 'moderationReasons',
 }
 
 export default class BoardEdit extends Command {
@@ -26,6 +27,7 @@ export default class BoardEdit extends Command {
     '5chan board edit flash.eth --per-page 30 --pages 1',
     '5chan board edit random.eth --reset per-page,bump-limit',
     '5chan board edit random.eth --per-page 20 --reset bump-limit',
+    '5chan board edit random.eth --reset moderation-reasons',
   ]
 
   static override flags = {
@@ -42,7 +44,7 @@ export default class BoardEdit extends Command {
       description: 'Seconds after archiving before purge',
     }),
     reset: Flags.string({
-      description: 'Comma-separated fields to reset to defaults (per-page, pages, bump-limit, archive-purge-seconds)',
+      description: 'Comma-separated fields to reset to defaults (per-page, pages, bump-limit, archive-purge-seconds, moderation-reasons)',
     }),
   }
 

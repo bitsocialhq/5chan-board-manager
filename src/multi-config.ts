@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import type { BoardManagerOptions, BoardConfig, MultiBoardConfig } from './types.js'
+import type { BoardManagerOptions, BoardConfig, ModerationReasons, MultiBoardConfig } from './types.js'
 
 /**
  * Load and validate a multi-board JSON config file.
@@ -47,6 +47,7 @@ export function loadMultiConfig(configPath: string): MultiBoardConfig {
       throw new Error(`Config file "${configPath}": "defaults" must be an object`)
     }
     validateNumericFields(config.defaults as Record<string, unknown>, 'defaults', configPath)
+    validateModerationReasons(config.defaults as Record<string, unknown>, 'defaults', configPath)
   }
 
   const seen = new Set<string>()
@@ -63,6 +64,7 @@ export function loadMultiConfig(configPath: string): MultiBoardConfig {
     }
     seen.add(board.address)
     validateNumericFields(board, `boards[${i}]`, configPath)
+    validateModerationReasons(board, `boards[${i}]`, configPath)
   }
 
   return config as unknown as MultiBoardConfig
@@ -79,6 +81,25 @@ function validateNumericFields(obj: Record<string, unknown>, prefix: string, con
   }
 }
 
+const MODERATION_REASONS_KEYS = ['archiveCapacity', 'archiveBumpLimit', 'purgeArchived', 'purgeDeleted'] as const
+
+function validateModerationReasons(obj: Record<string, unknown>, prefix: string, configPath: string): void {
+  if (obj.moderationReasons === undefined) return
+  if (typeof obj.moderationReasons !== 'object' || obj.moderationReasons === null || Array.isArray(obj.moderationReasons)) {
+    throw new Error(`Config file "${configPath}": ${prefix}.moderationReasons must be an object`)
+  }
+  const reasons = obj.moderationReasons as Record<string, unknown>
+  const allowed = new Set<string>(MODERATION_REASONS_KEYS)
+  for (const key of Object.keys(reasons)) {
+    if (!allowed.has(key)) {
+      throw new Error(`Config file "${configPath}": ${prefix}.moderationReasons has unknown key "${key}"`)
+    }
+    if (typeof reasons[key] !== 'string') {
+      throw new Error(`Config file "${configPath}": ${prefix}.moderationReasons.${key} must be a string`)
+    }
+  }
+}
+
 /**
  * Merge a board config with top-level defaults and rpcUrl/stateDir
  * to produce BoardManagerOptions for startBoardManager().
@@ -89,6 +110,18 @@ function validateNumericFields(obj: Record<string, unknown>, prefix: string, con
 export function resolveBoardManagerOptions(board: BoardConfig, config: MultiBoardConfig): BoardManagerOptions {
   const rpcUrl = config.rpcUrl ?? process.env.PLEBBIT_RPC_WS_URL ?? 'ws://localhost:9138'
 
+  const boardReasons = board.moderationReasons
+  const defaultReasons = config.defaults?.moderationReasons
+  let moderationReasons: ModerationReasons | undefined
+  if (boardReasons || defaultReasons) {
+    moderationReasons = {
+      archiveCapacity: boardReasons?.archiveCapacity ?? defaultReasons?.archiveCapacity,
+      archiveBumpLimit: boardReasons?.archiveBumpLimit ?? defaultReasons?.archiveBumpLimit,
+      purgeArchived: boardReasons?.purgeArchived ?? defaultReasons?.purgeArchived,
+      purgeDeleted: boardReasons?.purgeDeleted ?? defaultReasons?.purgeDeleted,
+    }
+  }
+
   return {
     subplebbitAddress: board.address,
     plebbitRpcUrl: rpcUrl,
@@ -97,5 +130,6 @@ export function resolveBoardManagerOptions(board: BoardConfig, config: MultiBoar
     pages: board.pages ?? config.defaults?.pages,
     bumpLimit: board.bumpLimit ?? config.defaults?.bumpLimit,
     archivePurgeSeconds: board.archivePurgeSeconds ?? config.defaults?.archivePurgeSeconds,
+    moderationReasons,
   }
 }

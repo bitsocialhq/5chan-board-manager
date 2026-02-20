@@ -28,6 +28,10 @@ export default class BoardList extends Command {
       if (board.pages !== undefined) overrides.push(`pages=${board.pages}`)
       if (board.bumpLimit !== undefined) overrides.push(`bumpLimit=${board.bumpLimit}`)
       if (board.archivePurgeSeconds !== undefined) overrides.push(`archivePurgeSeconds=${board.archivePurgeSeconds}`)
+      if (board.moderationReasons !== undefined) {
+        const reasonKeys = Object.keys(board.moderationReasons).join(', ')
+        overrides.push(`moderationReasons={${reasonKeys}}`)
+      }
 
       const suffix = overrides.length > 0 ? ` (${overrides.join(', ')})` : ''
       this.log(`  ${board.address}${suffix}`)

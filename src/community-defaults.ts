@@ -9,11 +9,19 @@ import type { Subplebbit } from './types.js'
 type SubplebbitEditOptions = Parameters<Subplebbit['edit']>[0]
 type ParseSubplebbitEditOptionsFn = (editOptions: SubplebbitEditOptions) => SubplebbitEditOptions
 
+export const ModerationReasonsSchema = z.object({
+  archiveCapacity: z.string().optional(),
+  archiveBumpLimit: z.string().optional(),
+  purgeArchived: z.string().optional(),
+  purgeDeleted: z.string().optional(),
+}).strict()
+
 export const BoardManagerSettingsSchema = z.object({
   perPage: z.number().int().positive().optional(),
   pages: z.number().int().positive().optional(),
   bumpLimit: z.number().int().positive().optional(),
   archivePurgeSeconds: z.number().int().positive().optional(),
+  moderationReasons: ModerationReasonsSchema.optional(),
 }).strict()
 
 export const CommunityDefaultsPresetBaseSchema = z.object({

@@ -2,7 +2,7 @@ import { connectToPlebbitRpc } from './plebbit-rpc.js'
 import Logger from '@plebbit/plebbit-logger'
 import { join } from 'node:path'
 import { loadState, saveState, defaultStateDir, acquireLock } from './state.js'
-import type { BoardManagerOptions, BoardManagerResult, BoardManagerState, Comment, FileLock, Subplebbit, Signer, ThreadComment, Page } from './types.js'
+import type { BoardManagerOptions, BoardManagerResult, BoardManagerState, Comment, FileLock, ModerationReasons, Subplebbit, Signer, ThreadComment, Page } from './types.js'
 
 const log = Logger('5chan:board-manager:archiver')
 
@@ -11,6 +11,12 @@ const DEFAULTS = {
   pages: 10,
   bumpLimit: 300,
   archivePurgeSeconds: 172800,
+  moderationReasons: {
+    archiveCapacity: '5chan board manager: thread archived — exceeded board capacity',
+    archiveBumpLimit: '5chan board manager: thread archived — reached bump limit',
+    purgeArchived: '5chan board manager: thread purged — archive retention expired',
+    purgeDeleted: '5chan board manager: content purged — author-deleted',
+  },
 } as const
 
 export async function startBoardManager(options: BoardManagerOptions): Promise<BoardManagerResult> {
@@ -22,6 +28,13 @@ export async function startBoardManager(options: BoardManagerOptions): Promise<B
     bumpLimit = DEFAULTS.bumpLimit,
     archivePurgeSeconds = DEFAULTS.archivePurgeSeconds,
   } = options
+
+  const moderationReasons: Required<ModerationReasons> = {
+    archiveCapacity: options.moderationReasons?.archiveCapacity ?? DEFAULTS.moderationReasons.archiveCapacity,
+    archiveBumpLimit: options.moderationReasons?.archiveBumpLimit ?? DEFAULTS.moderationReasons.archiveBumpLimit,
+    purgeArchived: options.moderationReasons?.purgeArchived ?? DEFAULTS.moderationReasons.purgeArchived,
+    purgeDeleted: options.moderationReasons?.purgeDeleted ?? DEFAULTS.moderationReasons.purgeDeleted,
+  }
 
   const maxThreads = perPage * pages
   const stateDir = options.stateDir ?? defaultStateDir()
@@ -76,7 +89,7 @@ export async function startBoardManager(options: BoardManagerOptions): Promise<B
     log(`archiving thread ${commentCid} (${reason})`)
     const mod = await plebbit.createCommentModeration({
       commentCid,
-      commentModeration: { archived: true },
+      commentModeration: { archived: true, reason },
       subplebbitAddress,
       signer,
     })
@@ -85,11 +98,11 @@ export async function startBoardManager(options: BoardManagerOptions): Promise<B
     saveState(statePath, state)
   }
 
-  async function purgeThread(commentCid: string, signer: Signer): Promise<void> {
+  async function purgeThread(commentCid: string, signer: Signer, reason: string): Promise<void> {
     log(`purging thread ${commentCid}`)
     const mod = await plebbit.createCommentModeration({
       commentCid,
-      commentModeration: { purged: true },
+      commentModeration: { purged: true, reason },
       subplebbitAddress,
       signer,
     })
@@ -98,11 +111,11 @@ export async function startBoardManager(options: BoardManagerOptions): Promise<B
     saveState(statePath, state)
   }
 
-  async function purgeDeletedComment(commentCid: string, signer: Signer): Promise<void> {
+  async function purgeDeletedComment(commentCid: string, signer: Signer, reason: string): Promise<void> {
     log(`purging author-deleted comment ${commentCid}`)
     const mod = await plebbit.createCommentModeration({
       commentCid,
-      commentModeration: { purged: true },
+      commentModeration: { purged: true, reason },
       subplebbitAddress,
       signer,
     })
@@ -231,7 +244,7 @@ export async function startBoardManager(options: BoardManagerOptions): Promise<B
       if (thread.archived) continue
       if (state.archivedThreads[thread.cid]) continue
       try {
-        await archiveThread(thread.cid, signer, 'capacity')
+        await archiveThread(thread.cid, signer, moderationReasons.archiveCapacity)
       } catch (err) {
         log.error(`failed to archive thread ${thread.cid}: ${err}`)
       }
@@ -243,7 +256,7 @@ export async function startBoardManager(options: BoardManagerOptions): Promise<B
       if (state.archivedThreads[thread.cid]) continue
       if ((thread.replyCount ?? 0) >= bumpLimit) {
         try {
-          await archiveThread(thread.cid, signer, 'bump-limit')
+          await archiveThread(thread.cid, signer, moderationReasons.archiveBumpLimit)
         } catch (err) {
           log.error(`failed to archive thread ${thread.cid}: ${err}`)
         }
@@ -255,7 +268,7 @@ export async function startBoardManager(options: BoardManagerOptions): Promise<B
     for (const [cid, info] of Object.entries(state.archivedThreads)) {
       if (now - info.archivedTimestamp > archivePurgeSeconds) {
         try {
-          await purgeThread(cid, signer)
+          await purgeThread(cid, signer, moderationReasons.purgeArchived)
         } catch (err) {
           log.error(`failed to purge thread ${cid}: ${err}`)
         }
@@ -266,7 +279,7 @@ export async function startBoardManager(options: BoardManagerOptions): Promise<B
     for (const thread of threads) {
       if (thread.deleted) {
         try {
-          await purgeDeletedComment(thread.cid, signer)
+          await purgeDeletedComment(thread.cid, signer, moderationReasons.purgeDeleted)
         } catch (err) {
           log.error(`failed to purge deleted thread ${thread.cid}: ${err}`)
         }
@@ -277,7 +290,7 @@ export async function startBoardManager(options: BoardManagerOptions): Promise<B
           const deletedReplyCids = await findDeletedReplies(thread)
           for (const cid of deletedReplyCids) {
             try {
-              await purgeDeletedComment(cid, signer)
+              await purgeDeletedComment(cid, signer, moderationReasons.purgeDeleted)
             } catch (err) {
               log.error(`failed to purge deleted reply ${cid}: ${err}`)
             }

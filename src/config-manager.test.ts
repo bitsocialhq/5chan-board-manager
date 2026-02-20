@@ -146,6 +146,40 @@ describe('loadConfig', () => {
     })
     expect(() => loadConfig(path)).toThrow('boards[0].address must be a non-empty string')
   })
+
+  it('loads config with moderationReasons in defaults', () => {
+    const dir = tmpDir()
+    const path = writeJson(dir, 'config.json', {
+      defaults: { moderationReasons: { archiveCapacity: 'custom' } },
+      boards: [{ address: 'x.eth' }],
+    })
+    const config = loadConfig(path)
+    expect(config.defaults?.moderationReasons?.archiveCapacity).toBe('custom')
+  })
+
+  it('rejects non-object moderationReasons', () => {
+    const dir = tmpDir()
+    const path = writeJson(dir, 'config.json', {
+      boards: [{ address: 'x.eth', moderationReasons: 42 }],
+    })
+    expect(() => loadConfig(path)).toThrow('boards[0].moderationReasons must be an object')
+  })
+
+  it('rejects unknown keys in moderationReasons', () => {
+    const dir = tmpDir()
+    const path = writeJson(dir, 'config.json', {
+      boards: [{ address: 'x.eth', moderationReasons: { badKey: 'val' } }],
+    })
+    expect(() => loadConfig(path)).toThrow('boards[0].moderationReasons has unknown key "badKey"')
+  })
+
+  it('rejects non-string values in moderationReasons', () => {
+    const dir = tmpDir()
+    const path = writeJson(dir, 'config.json', {
+      boards: [{ address: 'x.eth', moderationReasons: { purgeDeleted: true } }],
+    })
+    expect(() => loadConfig(path)).toThrow('boards[0].moderationReasons.purgeDeleted must be a string')
+  })
 })
 
 describe('saveConfig', () => {
@@ -449,6 +483,27 @@ describe('diffBoards', () => {
     expect(diff.changed).toHaveLength(1)
     expect(diff.changed[0]).toEqual({ address: 'a.eth', perPage: 20 })
   })
+
+  it('detects moderationReasons changes', () => {
+    const oldConfig: MultiBoardConfig = {
+      boards: [{ address: 'a.eth', moderationReasons: { archiveCapacity: 'old' } }],
+    }
+    const newConfig: MultiBoardConfig = {
+      boards: [{ address: 'a.eth', moderationReasons: { archiveCapacity: 'new' } }],
+    }
+    const diff = diffBoards(oldConfig, newConfig)
+    expect(diff.changed).toHaveLength(1)
+    expect(diff.changed[0].moderationReasons?.archiveCapacity).toBe('new')
+  })
+
+  it('no change when moderationReasons are identical', () => {
+    const reasons = { archiveCapacity: 'same' }
+    const config: MultiBoardConfig = {
+      boards: [{ address: 'a.eth', moderationReasons: reasons }],
+    }
+    const diff = diffBoards(config, { ...config, boards: [{ address: 'a.eth', moderationReasons: { ...reasons } }] })
+    expect(diff.changed).toHaveLength(0)
+  })
 })
 
 describe('updateBoard', () => {
@@ -547,5 +602,21 @@ describe('updateBoard', () => {
     }
     const result = updateBoard(config, 'a.eth', { bumpLimit: 500 })
     expect(result.boards[0].address).toBe('a.eth')
+  })
+
+  it('updates moderationReasons on a board', () => {
+    const config: MultiBoardConfig = {
+      boards: [{ address: 'a.eth' }],
+    }
+    const result = updateBoard(config, 'a.eth', { moderationReasons: { archiveCapacity: 'custom' } })
+    expect(result.boards[0].moderationReasons?.archiveCapacity).toBe('custom')
+  })
+
+  it('resets moderationReasons on a board', () => {
+    const config: MultiBoardConfig = {
+      boards: [{ address: 'a.eth', moderationReasons: { archiveCapacity: 'val' } }],
+    }
+    const result = updateBoard(config, 'a.eth', {}, ['moderationReasons'])
+    expect(Object.hasOwn(result.boards[0], 'moderationReasons')).toBe(false)
   })
 })

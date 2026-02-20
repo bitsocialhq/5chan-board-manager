@@ -81,6 +81,12 @@
     "perPage": 15,
     "pages": 10,
     "bumpLimit": 300,
-    "archivePurgeSeconds": 172800
+    "archivePurgeSeconds": 172800,
+    "moderationReasons": {
+      "archiveCapacity": "5chan board manager: thread archived — exceeded board capacity",
+      "archiveBumpLimit": "5chan board manager: thread archived — reached bump limit",
+      "purgeArchived": "5chan board manager: thread purged — archive retention expired",
+      "purgeDeleted": "5chan board manager: content purged — author-deleted"
+    }
   }
 }

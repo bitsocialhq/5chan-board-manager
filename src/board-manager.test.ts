@@ -19,7 +19,7 @@ function mockThread(cid: string, overrides: Record<string, unknown> = {}): Threa
 
 interface MockModerationRecord {
   commentCid: string
-  commentModeration: { archived?: boolean; purged?: boolean }
+  commentModeration: { archived?: boolean; purged?: boolean; reason?: string }
   subplebbitAddress: string
   signer: { address: string; privateKey: string; type: 'ed25519' }
 }
@@ -874,13 +874,13 @@ describe('board manager logic', () => {
       expect(purges[0].commentCid).toBe('QmDeleted')
       expect(purges[0].subplebbitAddress).toBe('board.eth')
       expect(purges[0].signer).toBeDefined()
-      expect(purges[0].commentModeration).toEqual({ purged: true })
+      expect(purges[0].commentModeration).toEqual({ purged: true, reason: '5chan board manager: content purged — author-deleted' })
 
       // Verify createCommentModeration was called with correct purge args
       expect(instance.createCommentModeration).toHaveBeenCalledWith(
         expect.objectContaining({
           commentCid: 'QmDeleted',
-          commentModeration: { purged: true },
+          commentModeration: { purged: true, reason: '5chan board manager: content purged — author-deleted' },
           subplebbitAddress: 'board.eth',
         })
       )
@@ -934,7 +934,7 @@ describe('board manager logic', () => {
       expect(purges[0].commentCid).toBe('QmReply2')
       expect(purges[0].subplebbitAddress).toBe('board.eth')
       expect(purges[0].signer).toBeDefined()
-      expect(purges[0].commentModeration).toEqual({ purged: true })
+      expect(purges[0].commentModeration).toEqual({ purged: true, reason: '5chan board manager: content purged — author-deleted' })
       await boardManager.stop()
     })
 
@@ -1016,6 +1016,196 @@ describe('board manager logic', () => {
       await boardManager.stop()
     })
 
+  })
+
+  describe('moderation reasons', () => {
+    it('uses default moderation reasons when not configured', async () => {
+      const { instance, publishedModerations } = createMockPlebbit()
+      const threads = Array.from({ length: 5 }, (_, i) => mockThread(`QmR${i}`))
+      const getPage = vi.fn().mockResolvedValue({
+        comments: threads,
+        nextCid: undefined,
+      } as Page)
+
+      const mockSub = createMockSubplebbit({
+        pageCids: { active: 'QmPage1' },
+        pages: {},
+        getPage,
+      })
+      vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
+
+      const boardManager = await startBoardManager({
+        subplebbitAddress: 'board.eth',
+        plebbitRpcUrl: 'ws://localhost:9138',
+        stateDir,
+        perPage: 2,
+        pages: 1, // capacity = 2, so 3 archived
+      })
+
+      await vi.waitFor(() => {
+        expect(publishedModerations).toHaveLength(3)
+      })
+
+      for (const mod of publishedModerations) {
+        expect(mod.commentModeration.reason).toBe('5chan board manager: thread archived — exceeded board capacity')
+      }
+      await boardManager.stop()
+    })
+
+    it('uses custom moderation reasons from options (partial override)', async () => {
+      const { instance, publishedModerations } = createMockPlebbit()
+      const threads = Array.from({ length: 4 }, (_, i) => mockThread(`QmC${i}`))
+      const getPage = vi.fn().mockResolvedValue({
+        comments: threads,
+        nextCid: undefined,
+      } as Page)
+
+      const mockSub = createMockSubplebbit({
+        pageCids: { active: 'QmPage1' },
+        pages: {},
+        getPage,
+      })
+      vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
+
+      const boardManager = await startBoardManager({
+        subplebbitAddress: 'board.eth',
+        plebbitRpcUrl: 'ws://localhost:9138',
+        stateDir,
+        perPage: 1,
+        pages: 1, // capacity = 1, so 3 archived
+        moderationReasons: {
+          archiveCapacity: 'Custom capacity reason',
+        },
+      })
+
+      await vi.waitFor(() => {
+        expect(publishedModerations).toHaveLength(3)
+      })
+
+      for (const mod of publishedModerations) {
+        expect(mod.commentModeration.reason).toBe('Custom capacity reason')
+      }
+      await boardManager.stop()
+    })
+
+    it('passes correct reason for bump-limit archive', async () => {
+      const { instance, publishedModerations } = createMockPlebbit()
+      const threads = [
+        mockThread('QmBump', { replyCount: 300 }),
+      ]
+      const getPage = vi.fn().mockResolvedValue({
+        comments: threads,
+        nextCid: undefined,
+      } as Page)
+
+      const mockSub = createMockSubplebbit({
+        pageCids: { active: 'QmPage1' },
+        pages: {},
+        getPage,
+      })
+      vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
+
+      const boardManager = await startBoardManager({
+        subplebbitAddress: 'board.eth',
+        plebbitRpcUrl: 'ws://localhost:9138',
+        stateDir,
+        perPage: 15,
+        pages: 10,
+        bumpLimit: 300,
+      })
+
+      await vi.waitFor(() => {
+        expect(publishedModerations).toHaveLength(1)
+      })
+
+      expect(publishedModerations[0].commentModeration).toEqual({
+        archived: true,
+        reason: '5chan board manager: thread archived — reached bump limit',
+      })
+      await boardManager.stop()
+    })
+
+    it('passes purge reason for archived thread purge', async () => {
+      const { instance, publishedModerations } = createMockPlebbit()
+      const threads = [mockThread('QmKeep')]
+      const getPage = vi.fn().mockResolvedValue({
+        comments: threads,
+        nextCid: undefined,
+      } as Page)
+
+      const mockSub = createMockSubplebbit({
+        pageCids: { active: 'QmPage1' },
+        pages: {},
+        getPage,
+      })
+      vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
+
+      // Pre-seed state with an old archived thread
+      const statePath = join(stateDir, 'board.eth.json')
+      saveState(statePath, {
+        signers: {},
+        archivedThreads: { 'QmOldArchived': { archivedTimestamp: 0 } },
+      })
+
+      const boardManager = await startBoardManager({
+        subplebbitAddress: 'board.eth',
+        plebbitRpcUrl: 'ws://localhost:9138',
+        stateDir,
+        perPage: 15,
+        pages: 10,
+        archivePurgeSeconds: 1,
+      })
+
+      await vi.waitFor(() => {
+        const purges = publishedModerations.filter((m) => m.commentModeration.purged === true)
+        expect(purges).toHaveLength(1)
+      })
+
+      const purges = publishedModerations.filter((m) => m.commentModeration.purged === true)
+      expect(purges[0].commentModeration).toEqual({
+        purged: true,
+        reason: '5chan board manager: thread purged — archive retention expired',
+      })
+      await boardManager.stop()
+    })
+
+    it('passes purge reason for author-deleted comment', async () => {
+      const { instance, publishedModerations } = createMockPlebbit()
+      const threads = [
+        mockThread('QmDel', { deleted: true }),
+      ]
+      const getPage = vi.fn().mockResolvedValue({
+        comments: threads,
+        nextCid: undefined,
+      } as Page)
+
+      const mockSub = createMockSubplebbit({
+        pageCids: { active: 'QmPage1' },
+        pages: {},
+        getPage,
+      })
+      vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
+
+      const boardManager = await startBoardManager({
+        subplebbitAddress: 'board.eth',
+        plebbitRpcUrl: 'ws://localhost:9138',
+        stateDir,
+        perPage: 15,
+        pages: 10,
+      })
+
+      await vi.waitFor(() => {
+        const purges = publishedModerations.filter((m) => m.commentModeration.purged === true)
+        expect(purges).toHaveLength(1)
+      })
+
+      const purges = publishedModerations.filter((m) => m.commentModeration.purged === true)
+      expect(purges[0].commentModeration).toEqual({
+        purged: true,
+        reason: '5chan board manager: content purged — author-deleted',
+      })
+      await boardManager.stop()
+    })
   })
 
   describe('per-subplebbit state isolation', () => {

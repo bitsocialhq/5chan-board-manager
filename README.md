@@ -37,12 +37,19 @@ The config file (`~/.config/5chan/config.json`) is managed via `5chan board add/
     "perPage": 15,
     "pages": 10,
     "bumpLimit": 300,
-    "archivePurgeSeconds": 172800
+    "archivePurgeSeconds": 172800,
+    "moderationReasons": {
+      "archiveCapacity": "5chan board manager: thread archived — exceeded board capacity",
+      "archiveBumpLimit": "5chan board manager: thread archived — reached bump limit",
+      "purgeArchived": "5chan board manager: thread purged — archive retention expired",
+      "purgeDeleted": "5chan board manager: content purged — author-deleted"
+    }
   },
   "boards": [
     { "address": "random.eth" },
     { "address": "tech.eth", "bumpLimit": 500 },
-    { "address": "flash.eth", "perPage": 30, "pages": 1 }
+    { "address": "flash.eth", "perPage": 30, "pages": 1 },
+    { "address": "custom.eth", "moderationReasons": { "archiveCapacity": "Custom archive reason for this board" } }
   ]
 }
 ```
@@ -53,7 +60,8 @@ All fields except `boards[].address` are optional:
 - `rpcUrl` — falls back to `PLEBBIT_RPC_WS_URL` env var, then `ws://localhost:9138`
 - `stateDir` — falls back to OS data directory
 - `defaults` — applied to all boards unless overridden per-board
-- Per-board fields (`perPage`, `pages`, `bumpLimit`, `archivePurgeSeconds`) override `defaults`
+- Per-board fields (`perPage`, `pages`, `bumpLimit`, `archivePurgeSeconds`, `moderationReasons`) override `defaults`
+- `moderationReasons` — optional object with `archiveCapacity`, `archiveBumpLimit`, `purgeArchived`, `purgeDeleted` string fields. Per-board values override defaults per-field (not the whole object). These reason strings are passed to `createCommentModeration()` so plebbit clients can display why a thread was archived or purged.
 
 
 
@@ -125,6 +133,9 @@ docker compose exec 5chan 5chan board edit random.eth --bump-limit 500
 
 # Reset a board field to global default
 docker compose exec 5chan 5chan board edit random.eth --reset per-page
+
+# Reset moderation reasons to defaults
+docker compose exec 5chan 5chan board edit random.eth --reset moderation-reasons
 
 # Remove a board
 docker compose exec 5chan 5chan board remove random.eth
@@ -504,6 +515,7 @@ Uses 4chan field names for interoperability.
 | `pages` | 10 | 1–10 | Number of index pages |
 | `bump_limit` | 300 | 300–500 | Max replies before thread is archived |
 | `archive_purge_seconds` | 172800 (48h) | ~48h | Seconds before archived posts are purged (no 4chan equivalent, 4chan uses ~48h) |
+| `moderationReasons` | (see below) | — | Reason strings passed to `createCommentModeration()`. Fields: `archiveCapacity`, `archiveBumpLimit`, `purgeArchived`, `purgeDeleted` |
 
 **Max active threads** = `per_page × pages` (default: 150)
 

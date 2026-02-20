@@ -236,6 +236,9 @@ Modified presets are validated before applying; invalid changes fail the command
       if (boardManagerDefaults.archivePurgeSeconds !== undefined) {
         board.archivePurgeSeconds = boardManagerDefaults.archivePurgeSeconds
       }
+      if (boardManagerDefaults.moderationReasons !== undefined) {
+        board.moderationReasons = boardManagerDefaults.moderationReasons
+      }
     }
     if (flags['per-page'] !== undefined) board.perPage = flags['per-page']
     if (flags.pages !== undefined) board.pages = flags.pages

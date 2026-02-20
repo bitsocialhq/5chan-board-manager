@@ -133,12 +133,12 @@ describe('board add command', () => {
 
   it('adds a board to an empty config', async () => {
     const dir = tmpDir()
-    await runCommand(['new-board.eth'], dir)
+    await runCommand(['new-board.bso'], dir)
 
     const config = loadConfig(dir)
     expect(config.boards).toHaveLength(1)
     expect(config.boards[0]).toEqual({
-      address: 'new-board.eth',
+      address: 'new-board.bso',
       perPage: 15,
       pages: 10,
       bumpLimit: 300,
@@ -148,16 +148,16 @@ describe('board add command', () => {
 
   it('validates board address before adding', async () => {
     const dir = tmpDir()
-    await runCommand(['board.eth', '--rpc-url', 'ws://test:9138'], dir)
+    await runCommand(['board.bso', '--rpc-url', 'ws://test:9138'], dir)
 
-    expect(mockValidate).toHaveBeenCalledWith('board.eth', 'ws://test:9138')
+    expect(mockValidate).toHaveBeenCalledWith('board.bso', 'ws://test:9138')
   })
 
   it('applies defaults by default in interactive mode', async () => {
     const dir = tmpDir()
-    await runCommand(['board.eth'], dir)
+    await runCommand(['board.bso'], dir)
     expect(mockApplyDefaults).toHaveBeenCalledWith(
-      'board.eth',
+      'board.bso',
       'ws://localhost:9138',
       await mockGetPreset.mock.results[0].value,
     )
@@ -166,7 +166,7 @@ describe('board add command', () => {
   it('adds a board with per-board overrides', async () => {
     const dir = tmpDir()
     await runCommand([
-      'board.eth',
+      'board.bso',
       '--per-page', '25',
       '--pages', '5',
       '--bump-limit', '500',
@@ -175,7 +175,7 @@ describe('board add command', () => {
 
     const config = loadConfig(dir)
     expect(config.boards[0]).toEqual({
-      address: 'board.eth',
+      address: 'board.bso',
       perPage: 25,
       pages: 5,
       bumpLimit: 500,
@@ -185,29 +185,29 @@ describe('board add command', () => {
 
   it('does not overwrite existing boards', async () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'existing.eth' })
+    writeBoardConfig(dir, { address: 'existing.bso' })
 
-    await runCommand(['new.eth'], dir)
+    await runCommand(['new.bso'], dir)
 
     const config = loadConfig(dir)
     expect(config.boards).toHaveLength(2)
-    expect(config.boards.map((b) => b.address).sort()).toEqual(['existing.eth', 'new.eth'])
+    expect(config.boards.map((b) => b.address).sort()).toEqual(['existing.bso', 'new.bso'])
   })
 
   it('throws when board already exists', async () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'dup.eth' })
+    writeBoardConfig(dir, { address: 'dup.bso' })
 
-    await expect(runCommand(['dup.eth'], dir)).rejects.toThrow('already exists')
+    await expect(runCommand(['dup.bso'], dir)).rejects.toThrow('already exists')
     expect(mockApplyDefaults).not.toHaveBeenCalled()
   })
 
   it('duplicate check runs before interactive prompt', async () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'dup.eth' })
+    writeBoardConfig(dir, { address: 'dup.bso' })
 
     const promptSpy = vi.fn()
-    const cmd = new BoardAdd(['dup.eth'], {} as never)
+    const cmd = new BoardAdd(['dup.bso'], {} as never)
     Object.defineProperty(cmd, 'config', {
       value: {
         configDir: dir,
@@ -226,60 +226,60 @@ describe('board add command', () => {
   it('errors when both apply and skip flags are provided', async () => {
     const dir = tmpDir()
     await expect(
-      runCommand(['board.eth', '--apply-defaults', '--skip-apply-defaults'], dir),
+      runCommand(['board.bso', '--apply-defaults', '--skip-apply-defaults'], dir),
     ).rejects.toThrow('Only one of --apply-defaults, --skip-apply-defaults, or --interactive-apply-defaults')
   })
 
   it('errors when apply and interactive flags are provided', async () => {
     const dir = tmpDir()
     await expect(
-      runCommand(['board.eth', '--apply-defaults', '--interactive-apply-defaults'], dir),
+      runCommand(['board.bso', '--apply-defaults', '--interactive-apply-defaults'], dir),
     ).rejects.toThrow('Only one of --apply-defaults, --skip-apply-defaults, or --interactive-apply-defaults')
   })
 
   it('errors when skip and interactive flags are provided', async () => {
     const dir = tmpDir()
     await expect(
-      runCommand(['board.eth', '--skip-apply-defaults', '--interactive-apply-defaults'], dir),
+      runCommand(['board.bso', '--skip-apply-defaults', '--interactive-apply-defaults'], dir),
     ).rejects.toThrow('Only one of --apply-defaults, --skip-apply-defaults, or --interactive-apply-defaults')
   })
 
   it('errors when all three flags are provided', async () => {
     const dir = tmpDir()
     await expect(
-      runCommand(['board.eth', '--apply-defaults', '--skip-apply-defaults', '--interactive-apply-defaults'], dir),
+      runCommand(['board.bso', '--apply-defaults', '--skip-apply-defaults', '--interactive-apply-defaults'], dir),
     ).rejects.toThrow('Only one of --apply-defaults, --skip-apply-defaults, or --interactive-apply-defaults')
   })
 
   it('errors when --interactive-apply-defaults is used in non-interactive mode', async () => {
     const dir = tmpDir()
     await expect(
-      runCommand(['board.eth', '--interactive-apply-defaults'], dir, { interactive: false }),
+      runCommand(['board.bso', '--interactive-apply-defaults'], dir, { interactive: false }),
     ).rejects.toThrow('--interactive-apply-defaults requires an interactive terminal (TTY)')
   })
 
   it('errors in non-interactive mode when no defaults decision flag is provided', async () => {
     const dir = tmpDir()
-    await expect(runCommand(['board.eth'], dir, { interactive: false })).rejects.toThrow(
+    await expect(runCommand(['board.bso'], dir, { interactive: false })).rejects.toThrow(
       'Non-interactive mode requires --apply-defaults or --skip-apply-defaults',
     )
   })
 
   it('skips applying defaults when --skip-apply-defaults is set', async () => {
     const dir = tmpDir()
-    await runCommand(['board.eth', '--skip-apply-defaults'], dir, { interactive: false })
+    await runCommand(['board.bso', '--skip-apply-defaults'], dir, { interactive: false })
     expect(mockApplyDefaults).not.toHaveBeenCalled()
   })
 
   it('applies defaults in non-interactive mode when --apply-defaults is set', async () => {
     const dir = tmpDir()
-    await runCommand(['board.eth', '--apply-defaults'], dir, { interactive: false })
+    await runCommand(['board.bso', '--apply-defaults'], dir, { interactive: false })
     expect(mockApplyDefaults).toHaveBeenCalledOnce()
   })
 
   it('skips defaults when interactive prompt returns skip', async () => {
     const dir = tmpDir()
-    await runCommand(['board.eth'], dir, { interactiveResult: 'skip' })
+    await runCommand(['board.bso'], dir, { interactiveResult: 'skip' })
     expect(mockApplyDefaults).not.toHaveBeenCalled()
   })
 
@@ -294,9 +294,9 @@ describe('board add command', () => {
         archivePurgeSeconds: 86400,
       },
     }
-    await runCommand(['board.eth'], dir, { interactiveResult: modifiedPreset })
+    await runCommand(['board.bso'], dir, { interactiveResult: modifiedPreset })
     expect(mockApplyDefaults).toHaveBeenCalledWith(
-      'board.eth',
+      'board.bso',
       'ws://localhost:9138',
       modifiedPreset,
     )
@@ -317,7 +317,7 @@ describe('board add command', () => {
     }))
 
     await runCommand(
-      ['board.eth', '--apply-defaults', '--defaults-preset', presetPath],
+      ['board.bso', '--apply-defaults', '--defaults-preset', presetPath],
       dir,
       { interactive: false },
     )
@@ -330,43 +330,43 @@ describe('board add command', () => {
 
   it('fails command and does not add board if applying defaults fails', async () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'existing.eth' })
+    writeBoardConfig(dir, { address: 'existing.bso' })
 
     mockApplyDefaults.mockRejectedValue(new Error('no moderator rights'))
     await expect(
-      runCommand(['new.eth', '--apply-defaults'], dir, { interactive: false }),
+      runCommand(['new.bso', '--apply-defaults'], dir, { interactive: false }),
     ).rejects.toThrow('no moderator rights')
 
     const config = loadConfig(dir)
     expect(config.boards).toHaveLength(1)
-    expect(config.boards[0].address).toBe('existing.eth')
+    expect(config.boards[0].address).toBe('existing.bso')
   })
 
   it('throws when validation fails', async () => {
     mockValidate.mockRejectedValue(new Error('Subplebbit not found'))
     const dir = tmpDir()
 
-    await expect(runCommand(['bad.eth'], dir)).rejects.toThrow('Subplebbit not found')
+    await expect(runCommand(['bad.bso'], dir)).rejects.toThrow('Subplebbit not found')
   })
 
   it('prints confirmation message', async () => {
     const dir = tmpDir()
-    const { stdout } = await runCommand(['board.eth'], dir)
-    expect(stdout).toContain('Added board "board.eth"')
+    const { stdout } = await runCommand(['board.bso'], dir)
+    expect(stdout).toContain('Added board "board.bso"')
   })
 
   it('board config has no preset values when defaults are skipped', async () => {
     const dir = tmpDir()
-    await runCommand(['board.eth', '--skip-apply-defaults'], dir, { interactive: false })
+    await runCommand(['board.bso', '--skip-apply-defaults'], dir, { interactive: false })
 
     const config = loadConfig(dir)
-    expect(config.boards[0]).toEqual({ address: 'board.eth' })
+    expect(config.boards[0]).toEqual({ address: 'board.bso' })
   })
 
   it('cli flag overrides override interactive preset values', async () => {
     const dir = tmpDir()
     await runCommand(
-      ['board.eth', '--per-page', '99'],
+      ['board.bso', '--per-page', '99'],
       dir,
       { interactiveResult: DEFAULT_PRESET },
     )
@@ -378,26 +378,26 @@ describe('board add command', () => {
 
   it('creates board file in boards/ directory', async () => {
     const dir = tmpDir()
-    await runCommand(['my-board.eth', '--skip-apply-defaults'], dir, { interactive: false })
+    await runCommand(['my-board.bso', '--skip-apply-defaults'], dir, { interactive: false })
 
-    expect(existsSync(join(dir, 'boards', 'my-board.eth.json'))).toBe(true)
+    expect(existsSync(join(dir, 'boards', 'my-board.bso.json'))).toBe(true)
   })
 
   it('throws descriptive error for unknown flag', async () => {
     const dir = tmpDir()
 
-    await expect(runCommand(['new.eth', '--title', 'My Board'], dir)).rejects.toThrow('Unknown option: --title')
+    await expect(runCommand(['new.bso', '--title', 'My Board'], dir)).rejects.toThrow('Unknown option: --title')
   })
 
   it('mentions bitsocial-cli in unknown flag error', async () => {
     const dir = tmpDir()
 
-    await expect(runCommand(['new.eth', '--title', 'My Board'], dir)).rejects.toThrow('bitsocial-cli')
+    await expect(runCommand(['new.bso', '--title', 'My Board'], dir)).rejects.toThrow('bitsocial-cli')
   })
 
   it('mentions 5chan settings in unknown flag error', async () => {
     const dir = tmpDir()
 
-    await expect(runCommand(['new.eth', '--title', 'My Board'], dir)).rejects.toThrow('5chan settings')
+    await expect(runCommand(['new.bso', '--title', 'My Board'], dir)).rejects.toThrow('5chan settings')
   })
 })

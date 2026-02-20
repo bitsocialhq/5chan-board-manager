@@ -12,7 +12,7 @@ export default class BoardRemove extends Command {
   static override description = 'Remove a board from the config'
 
   static override examples = [
-    '5chan board remove random.eth',
+    '5chan board remove random.bso',
   ]
 
   async run(): Promise<void> {

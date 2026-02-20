@@ -103,9 +103,9 @@ describe('formatPresetDisplay', () => {
       { dotPath: 'perPage', value: 15, section: 'boardManagerSettings' },
     ]
 
-    const output = formatPresetDisplay('board.eth', entries)
+    const output = formatPresetDisplay('board.bso', entries)
 
-    expect(output).toContain('Preset defaults for "board.eth"')
+    expect(output).toContain('Preset defaults for "board.bso"')
     expect(output).toContain('Board Settings (applied to subplebbit)')
     expect(output).toContain('features.noUpvotes')
     expect(output).toContain('true')
@@ -119,7 +119,7 @@ describe('formatPresetDisplay', () => {
       { dotPath: 'perPage', value: 15, section: 'boardManagerSettings' },
     ]
 
-    const output = formatPresetDisplay('board.eth', entries)
+    const output = formatPresetDisplay('board.bso', entries)
 
     expect(output).toContain('Board Settings: (none)')
     expect(output).toContain('Board Manager Settings (config)')
@@ -130,7 +130,7 @@ describe('formatPresetDisplay', () => {
       { dotPath: 'settings.challenges', value: [{ name: 'fail' }, { name: 'captcha' }], section: 'boardSettings' },
     ]
 
-    const output = formatPresetDisplay('board.eth', entries)
+    const output = formatPresetDisplay('board.bso', entries)
     expect(output).toContain('[Array: 2 items]')
   })
 
@@ -139,7 +139,7 @@ describe('formatPresetDisplay', () => {
       { dotPath: 'options', value: { width: '280', height: '96' }, section: 'boardSettings' },
     ]
 
-    const output = formatPresetDisplay('board.eth', entries)
+    const output = formatPresetDisplay('board.bso', entries)
     expect(output).toContain('{Object: width, height}')
   })
 
@@ -148,7 +148,7 @@ describe('formatPresetDisplay', () => {
       { dotPath: 'settings.challenges', value: [{ name: 'fail' }], section: 'boardSettings' },
     ]
 
-    const output = formatPresetDisplay('board.eth', entries)
+    const output = formatPresetDisplay('board.bso', entries)
     expect(output).toContain('[Array: 1 item]')
   })
 })

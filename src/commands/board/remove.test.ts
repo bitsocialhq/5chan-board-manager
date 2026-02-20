@@ -52,39 +52,39 @@ describe('board remove command', () => {
 
   it('removes a board from the config', async () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'a.eth' })
-    writeBoardConfig(dir, { address: 'b.eth' })
+    writeBoardConfig(dir, { address: 'a.bso' })
+    writeBoardConfig(dir, { address: 'b.bso' })
 
-    await runCommand(['a.eth'], dir)
+    await runCommand(['a.bso'], dir)
 
-    expect(existsSync(join(dir, 'boards', 'a.eth.json'))).toBe(false)
-    expect(existsSync(join(dir, 'boards', 'b.eth.json'))).toBe(true)
+    expect(existsSync(join(dir, 'boards', 'a.bso.json'))).toBe(false)
+    expect(existsSync(join(dir, 'boards', 'b.bso.json'))).toBe(true)
   })
 
   it('throws when board not found', async () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'a.eth' })
+    writeBoardConfig(dir, { address: 'a.bso' })
 
-    await expect(runCommand(['missing.eth'], dir)).rejects.toThrow('not found')
+    await expect(runCommand(['missing.bso'], dir)).rejects.toThrow('not found')
   })
 
   it('prints confirmation message', async () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'board.eth' })
+    writeBoardConfig(dir, { address: 'board.bso' })
 
-    const { stdout } = await runCommand(['board.eth'], dir)
-    expect(stdout).toContain('Removed board "board.eth"')
+    const { stdout } = await runCommand(['board.bso'], dir)
+    expect(stdout).toContain('Removed board "board.bso"')
   })
 
   it('does not affect other board files', async () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'a.eth' })
-    writeBoardConfig(dir, { address: 'b.eth' })
+    writeBoardConfig(dir, { address: 'a.bso' })
+    writeBoardConfig(dir, { address: 'b.bso' })
 
-    await runCommand(['a.eth'], dir)
+    await runCommand(['a.bso'], dir)
 
     const config = loadConfig(dir)
     expect(config.boards).toHaveLength(1)
-    expect(config.boards[0].address).toBe('b.eth')
+    expect(config.boards[0].address).toBe('b.bso')
   })
 })

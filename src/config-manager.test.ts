@@ -31,7 +31,7 @@ describe('path helpers', () => {
   })
 
   it('boardConfigPath returns boards/{address}.json path', () => {
-    expect(boardConfigPath('/foo/bar', 'test.eth')).toBe('/foo/bar/boards/test.eth.json')
+    expect(boardConfigPath('/foo/bar', 'test.bso')).toBe('/foo/bar/boards/test.bso.json')
   })
 })
 
@@ -65,12 +65,12 @@ describe('loadConfig', () => {
   it('loads global.json + single board file', () => {
     const dir = tmpDir()
     writeGlobalConfig(dir, { rpcUrl: 'ws://custom:9138' })
-    writeBoardConfig(dir, { address: 'board.eth' })
+    writeBoardConfig(dir, { address: 'board.bso' })
 
     const config = loadConfig(dir)
     expect(config.rpcUrl).toBe('ws://custom:9138')
     expect(config.boards).toHaveLength(1)
-    expect(config.boards[0].address).toBe('board.eth')
+    expect(config.boards[0].address).toBe('board.bso')
   })
 
   it('loads full config with all fields', () => {
@@ -80,15 +80,15 @@ describe('loadConfig', () => {
       stateDir: '/data/state',
       defaults: { perPage: 20, pages: 5, bumpLimit: 400, archivePurgeSeconds: 86400 },
     })
-    writeBoardConfig(dir, { address: 'a.eth' })
-    writeBoardConfig(dir, { address: 'b.eth', bumpLimit: 600 })
+    writeBoardConfig(dir, { address: 'a.bso' })
+    writeBoardConfig(dir, { address: 'b.bso', bumpLimit: 600 })
 
     const config = loadConfig(dir)
     expect(config.rpcUrl).toBe('ws://custom:9138')
     expect(config.stateDir).toBe('/data/state')
     expect(config.defaults?.perPage).toBe(20)
     expect(config.boards).toHaveLength(2)
-    expect(config.boards.find((b) => b.address === 'b.eth')?.bumpLimit).toBe(600)
+    expect(config.boards.find((b) => b.address === 'b.bso')?.bumpLimit).toBe(600)
   })
 
   it('returns empty boards when boards/ directory is missing', () => {
@@ -116,13 +116,13 @@ describe('loadConfig', () => {
     mkdirSync(boardsDir, { recursive: true })
     // Write two files with same address but different filenames (impossible if filename matches)
     // Actually with filename validation this can't happen, test that filename mismatch is caught
-    writeFileSync(join(boardsDir, 'wrong.json'), JSON.stringify({ address: 'board.eth' }))
-    expect(() => loadConfig(dir)).toThrow('filename "wrong.json" does not match address "board.eth"')
+    writeFileSync(join(boardsDir, 'wrong.json'), JSON.stringify({ address: 'board.bso' }))
+    expect(() => loadConfig(dir)).toThrow('filename "wrong.json" does not match address "board.bso"')
   })
 
   it('throws when a numeric field is not a positive integer', () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'x.eth', perPage: -1 })
+    writeBoardConfig(dir, { address: 'x.bso', perPage: -1 })
     expect(() => loadConfig(dir)).toThrow('perPage must be a positive integer')
   })
 
@@ -155,26 +155,26 @@ describe('loadConfig', () => {
   it('loads config with moderationReasons in defaults', () => {
     const dir = tmpDir()
     writeGlobalConfig(dir, { defaults: { moderationReasons: { archiveCapacity: 'custom' } } })
-    writeBoardConfig(dir, { address: 'x.eth' })
+    writeBoardConfig(dir, { address: 'x.bso' })
     const config = loadConfig(dir)
     expect(config.defaults?.moderationReasons?.archiveCapacity).toBe('custom')
   })
 
   it('rejects non-object moderationReasons', () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'x.eth', moderationReasons: 42 })
+    writeBoardConfig(dir, { address: 'x.bso', moderationReasons: 42 })
     expect(() => loadConfig(dir)).toThrow('moderationReasons must be an object')
   })
 
   it('rejects unknown keys in moderationReasons', () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'x.eth', moderationReasons: { badKey: 'val' } })
+    writeBoardConfig(dir, { address: 'x.bso', moderationReasons: { badKey: 'val' } })
     expect(() => loadConfig(dir)).toThrow('moderationReasons has unknown key "badKey"')
   })
 
   it('rejects non-string values in moderationReasons', () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'x.eth', moderationReasons: { purgeDeleted: true } })
+    writeBoardConfig(dir, { address: 'x.bso', moderationReasons: { purgeDeleted: true } })
     expect(() => loadConfig(dir)).toThrow('moderationReasons.purgeDeleted must be a string')
   })
 })
@@ -232,31 +232,31 @@ describe('saveBoardConfig', () => {
 
   it('writes board config to boards/{address}.json', () => {
     const dir = tmpDir()
-    const board: BoardConfig = { address: 'test.eth', bumpLimit: 500 }
+    const board: BoardConfig = { address: 'test.bso', bumpLimit: 500 }
     saveBoardConfig(dir, board)
-    const written = readFileSync(join(dir, 'boards', 'test.eth.json'), 'utf-8')
+    const written = readFileSync(join(dir, 'boards', 'test.bso.json'), 'utf-8')
     expect(JSON.parse(written)).toEqual(board)
     expect(written.endsWith('\n')).toBe(true)
   })
 
   it('creates boards/ directory if missing', () => {
     const dir = tmpDir()
-    saveBoardConfig(dir, { address: 'new.eth' })
-    expect(existsSync(join(dir, 'boards', 'new.eth.json'))).toBe(true)
+    saveBoardConfig(dir, { address: 'new.bso' })
+    expect(existsSync(join(dir, 'boards', 'new.bso.json'))).toBe(true)
   })
 
   it('overwrites existing board config', () => {
     const dir = tmpDir()
-    saveBoardConfig(dir, { address: 'a.eth', bumpLimit: 300 })
-    saveBoardConfig(dir, { address: 'a.eth', bumpLimit: 500 })
-    const written = JSON.parse(readFileSync(join(dir, 'boards', 'a.eth.json'), 'utf-8'))
+    saveBoardConfig(dir, { address: 'a.bso', bumpLimit: 300 })
+    saveBoardConfig(dir, { address: 'a.bso', bumpLimit: 500 })
+    const written = JSON.parse(readFileSync(join(dir, 'boards', 'a.bso.json'), 'utf-8'))
     expect(written.bumpLimit).toBe(500)
   })
 
   it('does not leave a .tmp file after successful write', () => {
     const dir = tmpDir()
-    saveBoardConfig(dir, { address: 'a.eth' })
-    const filePath = join(dir, 'boards', 'a.eth.json')
+    saveBoardConfig(dir, { address: 'a.bso' })
+    const filePath = join(dir, 'boards', 'a.bso.json')
     expect(existsSync(filePath)).toBe(true)
     expect(existsSync(filePath + '.tmp')).toBe(false)
   })
@@ -280,48 +280,48 @@ describe('deleteBoardConfig', () => {
 
   it('deletes a board config file', () => {
     const dir = tmpDir()
-    saveBoardConfig(dir, { address: 'a.eth' })
-    expect(existsSync(join(dir, 'boards', 'a.eth.json'))).toBe(true)
+    saveBoardConfig(dir, { address: 'a.bso' })
+    expect(existsSync(join(dir, 'boards', 'a.bso.json'))).toBe(true)
 
-    deleteBoardConfig(dir, 'a.eth')
-    expect(existsSync(join(dir, 'boards', 'a.eth.json'))).toBe(false)
+    deleteBoardConfig(dir, 'a.bso')
+    expect(existsSync(join(dir, 'boards', 'a.bso.json'))).toBe(false)
   })
 
   it('throws when board not found', () => {
     const dir = tmpDir()
     mkdirSync(join(dir, 'boards'), { recursive: true })
-    expect(() => deleteBoardConfig(dir, 'missing.eth')).toThrow('Board "missing.eth" not found')
+    expect(() => deleteBoardConfig(dir, 'missing.bso')).toThrow('Board "missing.bso" not found')
   })
 })
 
 describe('updateBoardConfig', () => {
   it('updates a single field on an existing board', () => {
-    const board: BoardConfig = { address: 'a.eth', bumpLimit: 300 }
+    const board: BoardConfig = { address: 'a.bso', bumpLimit: 300 }
     const result = updateBoardConfig(board, { bumpLimit: 500 })
     expect(result.bumpLimit).toBe(500)
   })
 
   it('adds a new field to an existing board', () => {
-    const board: BoardConfig = { address: 'a.eth' }
+    const board: BoardConfig = { address: 'a.bso' }
     const result = updateBoardConfig(board, { perPage: 25 })
     expect(result.perPage).toBe(25)
   })
 
   it('updates multiple fields at once', () => {
-    const board: BoardConfig = { address: 'a.eth' }
+    const board: BoardConfig = { address: 'a.bso' }
     const result = updateBoardConfig(board, { perPage: 25, pages: 3 })
     expect(result.perPage).toBe(25)
     expect(result.pages).toBe(3)
   })
 
   it('resets a field to undefined', () => {
-    const board: BoardConfig = { address: 'a.eth', bumpLimit: 500 }
+    const board: BoardConfig = { address: 'a.bso', bumpLimit: 500 }
     const result = updateBoardConfig(board, {}, ['bumpLimit'])
     expect(Object.hasOwn(result, 'bumpLimit')).toBe(false)
   })
 
   it('resets multiple fields', () => {
-    const board: BoardConfig = { address: 'a.eth', perPage: 25, pages: 3, bumpLimit: 500, archivePurgeSeconds: 86400 }
+    const board: BoardConfig = { address: 'a.bso', perPage: 25, pages: 3, bumpLimit: 500, archivePurgeSeconds: 86400 }
     const result = updateBoardConfig(board, {}, ['perPage', 'bumpLimit'])
     expect(Object.hasOwn(result, 'perPage')).toBe(false)
     expect(Object.hasOwn(result, 'bumpLimit')).toBe(false)
@@ -330,40 +330,40 @@ describe('updateBoardConfig', () => {
   })
 
   it('allows setting one field and resetting another simultaneously', () => {
-    const board: BoardConfig = { address: 'a.eth', perPage: 25, bumpLimit: 300 }
+    const board: BoardConfig = { address: 'a.bso', perPage: 25, bumpLimit: 300 }
     const result = updateBoardConfig(board, { perPage: 30 }, ['bumpLimit'])
     expect(result.perPage).toBe(30)
     expect(Object.hasOwn(result, 'bumpLimit')).toBe(false)
   })
 
   it('throws when setting and resetting the same field', () => {
-    const board: BoardConfig = { address: 'a.eth' }
+    const board: BoardConfig = { address: 'a.bso' }
     expect(() => updateBoardConfig(board, { perPage: 25 }, ['perPage'])).toThrow(
       'Cannot set and reset the same field "perPage"',
     )
   })
 
   it('does not mutate the original board', () => {
-    const board: BoardConfig = { address: 'a.eth', bumpLimit: 300 }
+    const board: BoardConfig = { address: 'a.bso', bumpLimit: 300 }
     const result = updateBoardConfig(board, { bumpLimit: 500 })
     expect(board.bumpLimit).toBe(300)
     expect(result.bumpLimit).toBe(500)
   })
 
   it('preserves address field', () => {
-    const board: BoardConfig = { address: 'a.eth' }
+    const board: BoardConfig = { address: 'a.bso' }
     const result = updateBoardConfig(board, { bumpLimit: 500 })
-    expect(result.address).toBe('a.eth')
+    expect(result.address).toBe('a.bso')
   })
 
   it('updates moderationReasons on a board', () => {
-    const board: BoardConfig = { address: 'a.eth' }
+    const board: BoardConfig = { address: 'a.bso' }
     const result = updateBoardConfig(board, { moderationReasons: { archiveCapacity: 'custom' } })
     expect(result.moderationReasons?.archiveCapacity).toBe('custom')
   })
 
   it('resets moderationReasons on a board', () => {
-    const board: BoardConfig = { address: 'a.eth', moderationReasons: { archiveCapacity: 'val' } }
+    const board: BoardConfig = { address: 'a.bso', moderationReasons: { archiveCapacity: 'val' } }
     const result = updateBoardConfig(board, {}, ['moderationReasons'])
     expect(Object.hasOwn(result, 'moderationReasons')).toBe(false)
   })
@@ -371,42 +371,42 @@ describe('updateBoardConfig', () => {
 
 describe('diffBoards', () => {
   it('detects added boards', () => {
-    const oldConfig: MultiBoardConfig = { boards: [{ address: 'a.eth' }] }
+    const oldConfig: MultiBoardConfig = { boards: [{ address: 'a.bso' }] }
     const newConfig: MultiBoardConfig = {
-      boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
+      boards: [{ address: 'a.bso' }, { address: 'b.bso' }],
     }
     const diff = diffBoards(oldConfig, newConfig)
     expect(diff.added).toHaveLength(1)
-    expect(diff.added[0].address).toBe('b.eth')
+    expect(diff.added[0].address).toBe('b.bso')
     expect(diff.removed).toHaveLength(0)
   })
 
   it('detects removed boards', () => {
     const oldConfig: MultiBoardConfig = {
-      boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
+      boards: [{ address: 'a.bso' }, { address: 'b.bso' }],
     }
-    const newConfig: MultiBoardConfig = { boards: [{ address: 'a.eth' }] }
+    const newConfig: MultiBoardConfig = { boards: [{ address: 'a.bso' }] }
     const diff = diffBoards(oldConfig, newConfig)
     expect(diff.added).toHaveLength(0)
-    expect(diff.removed).toEqual(['b.eth'])
+    expect(diff.removed).toEqual(['b.bso'])
   })
 
   it('detects both added and removed boards', () => {
     const oldConfig: MultiBoardConfig = {
-      boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
+      boards: [{ address: 'a.bso' }, { address: 'b.bso' }],
     }
     const newConfig: MultiBoardConfig = {
-      boards: [{ address: 'a.eth' }, { address: 'c.eth' }],
+      boards: [{ address: 'a.bso' }, { address: 'c.bso' }],
     }
     const diff = diffBoards(oldConfig, newConfig)
     expect(diff.added).toHaveLength(1)
-    expect(diff.added[0].address).toBe('c.eth')
-    expect(diff.removed).toEqual(['b.eth'])
+    expect(diff.added[0].address).toBe('c.bso')
+    expect(diff.removed).toEqual(['b.bso'])
   })
 
   it('returns empty diff when configs are identical', () => {
     const config: MultiBoardConfig = {
-      boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
+      boards: [{ address: 'a.bso' }, { address: 'b.bso' }],
     }
     const diff = diffBoards(config, config)
     expect(diff.added).toHaveLength(0)
@@ -416,7 +416,7 @@ describe('diffBoards', () => {
   it('handles empty old config', () => {
     const oldConfig: MultiBoardConfig = { boards: [] }
     const newConfig: MultiBoardConfig = {
-      boards: [{ address: 'a.eth' }],
+      boards: [{ address: 'a.bso' }],
     }
     const diff = diffBoards(oldConfig, newConfig)
     expect(diff.added).toHaveLength(1)
@@ -425,43 +425,43 @@ describe('diffBoards', () => {
 
   it('handles empty new config', () => {
     const oldConfig: MultiBoardConfig = {
-      boards: [{ address: 'a.eth' }],
+      boards: [{ address: 'a.bso' }],
     }
     const newConfig: MultiBoardConfig = { boards: [] }
     const diff = diffBoards(oldConfig, newConfig)
     expect(diff.added).toHaveLength(0)
-    expect(diff.removed).toEqual(['a.eth'])
+    expect(diff.removed).toEqual(['a.bso'])
   })
 
   it('preserves board config details in added boards', () => {
     const oldConfig: MultiBoardConfig = { boards: [] }
     const newConfig: MultiBoardConfig = {
-      boards: [{ address: 'a.eth', bumpLimit: 500, perPage: 30 }],
+      boards: [{ address: 'a.bso', bumpLimit: 500, perPage: 30 }],
     }
     const diff = diffBoards(oldConfig, newConfig)
-    expect(diff.added[0]).toEqual({ address: 'a.eth', bumpLimit: 500, perPage: 30 })
+    expect(diff.added[0]).toEqual({ address: 'a.bso', bumpLimit: 500, perPage: 30 })
   })
 
   it('detects changed boards when a field is modified', () => {
     const oldConfig: MultiBoardConfig = {
-      boards: [{ address: 'a.eth', bumpLimit: 300 }],
+      boards: [{ address: 'a.bso', bumpLimit: 300 }],
     }
     const newConfig: MultiBoardConfig = {
-      boards: [{ address: 'a.eth', bumpLimit: 500 }],
+      boards: [{ address: 'a.bso', bumpLimit: 500 }],
     }
     const diff = diffBoards(oldConfig, newConfig)
     expect(diff.added).toHaveLength(0)
     expect(diff.removed).toHaveLength(0)
     expect(diff.changed).toHaveLength(1)
-    expect(diff.changed[0]).toEqual({ address: 'a.eth', bumpLimit: 500 })
+    expect(diff.changed[0]).toEqual({ address: 'a.bso', bumpLimit: 500 })
   })
 
   it('detects changed boards when a field is added', () => {
     const oldConfig: MultiBoardConfig = {
-      boards: [{ address: 'a.eth' }],
+      boards: [{ address: 'a.bso' }],
     }
     const newConfig: MultiBoardConfig = {
-      boards: [{ address: 'a.eth', perPage: 25 }],
+      boards: [{ address: 'a.bso', perPage: 25 }],
     }
     const diff = diffBoards(oldConfig, newConfig)
     expect(diff.changed).toHaveLength(1)
@@ -470,45 +470,45 @@ describe('diffBoards', () => {
 
   it('detects changed boards when a field is removed', () => {
     const oldConfig: MultiBoardConfig = {
-      boards: [{ address: 'a.eth', bumpLimit: 300 }],
+      boards: [{ address: 'a.bso', bumpLimit: 300 }],
     }
     const newConfig: MultiBoardConfig = {
-      boards: [{ address: 'a.eth' }],
+      boards: [{ address: 'a.bso' }],
     }
     const diff = diffBoards(oldConfig, newConfig)
     expect(diff.changed).toHaveLength(1)
-    expect(diff.changed[0]).toEqual({ address: 'a.eth' })
+    expect(diff.changed[0]).toEqual({ address: 'a.bso' })
   })
 
   it('returns empty changed when board configs are identical', () => {
     const config: MultiBoardConfig = {
-      boards: [{ address: 'a.eth', bumpLimit: 300 }],
+      boards: [{ address: 'a.bso', bumpLimit: 300 }],
     }
-    const diff = diffBoards(config, { ...config, boards: [{ address: 'a.eth', bumpLimit: 300 }] })
+    const diff = diffBoards(config, { ...config, boards: [{ address: 'a.bso', bumpLimit: 300 }] })
     expect(diff.changed).toHaveLength(0)
   })
 
   it('separates added, removed, and changed correctly', () => {
     const oldConfig: MultiBoardConfig = {
-      boards: [{ address: 'a.eth', perPage: 10 }, { address: 'b.eth' }],
+      boards: [{ address: 'a.bso', perPage: 10 }, { address: 'b.bso' }],
     }
     const newConfig: MultiBoardConfig = {
-      boards: [{ address: 'a.eth', perPage: 20 }, { address: 'c.eth' }],
+      boards: [{ address: 'a.bso', perPage: 20 }, { address: 'c.bso' }],
     }
     const diff = diffBoards(oldConfig, newConfig)
     expect(diff.added).toHaveLength(1)
-    expect(diff.added[0].address).toBe('c.eth')
-    expect(diff.removed).toEqual(['b.eth'])
+    expect(diff.added[0].address).toBe('c.bso')
+    expect(diff.removed).toEqual(['b.bso'])
     expect(diff.changed).toHaveLength(1)
-    expect(diff.changed[0]).toEqual({ address: 'a.eth', perPage: 20 })
+    expect(diff.changed[0]).toEqual({ address: 'a.bso', perPage: 20 })
   })
 
   it('detects moderationReasons changes', () => {
     const oldConfig: MultiBoardConfig = {
-      boards: [{ address: 'a.eth', moderationReasons: { archiveCapacity: 'old' } }],
+      boards: [{ address: 'a.bso', moderationReasons: { archiveCapacity: 'old' } }],
     }
     const newConfig: MultiBoardConfig = {
-      boards: [{ address: 'a.eth', moderationReasons: { archiveCapacity: 'new' } }],
+      boards: [{ address: 'a.bso', moderationReasons: { archiveCapacity: 'new' } }],
     }
     const diff = diffBoards(oldConfig, newConfig)
     expect(diff.changed).toHaveLength(1)
@@ -518,9 +518,9 @@ describe('diffBoards', () => {
   it('no change when moderationReasons are identical', () => {
     const reasons = { archiveCapacity: 'same' }
     const config: MultiBoardConfig = {
-      boards: [{ address: 'a.eth', moderationReasons: reasons }],
+      boards: [{ address: 'a.bso', moderationReasons: reasons }],
     }
-    const diff = diffBoards(config, { ...config, boards: [{ address: 'a.eth', moderationReasons: { ...reasons } }] })
+    const diff = diffBoards(config, { ...config, boards: [{ address: 'a.bso', moderationReasons: { ...reasons } }] })
     expect(diff.changed).toHaveLength(0)
   })
 })

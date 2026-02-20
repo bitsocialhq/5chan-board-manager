@@ -56,19 +56,19 @@ describe('board list command', () => {
 
   it('lists boards', async () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'a.eth' })
-    writeBoardConfig(dir, { address: 'b.eth' })
+    writeBoardConfig(dir, { address: 'a.bso' })
+    writeBoardConfig(dir, { address: 'b.bso' })
 
     const { stdout } = await runCommand([], dir)
-    expect(stdout).toContain('a.eth')
-    expect(stdout).toContain('b.eth')
+    expect(stdout).toContain('a.bso')
+    expect(stdout).toContain('b.bso')
   })
 
   it('outputs one address per line', async () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'a.eth' })
-    writeBoardConfig(dir, { address: 'b.eth' })
-    writeBoardConfig(dir, { address: 'c.eth' })
+    writeBoardConfig(dir, { address: 'a.bso' })
+    writeBoardConfig(dir, { address: 'b.bso' })
+    writeBoardConfig(dir, { address: 'c.bso' })
 
     const { stdout } = await runCommand([], dir)
     const lines = stdout.trim().split('\n')
@@ -77,7 +77,7 @@ describe('board list command', () => {
 
   it('outputs only addresses with no extra text', async () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'a.eth', bumpLimit: 500, perPage: 30 })
+    writeBoardConfig(dir, { address: 'a.bso', bumpLimit: 500, perPage: 30 })
 
     const { stdout } = await runCommand([], dir)
     expect(stdout).not.toContain('bumpLimit')
@@ -85,6 +85,6 @@ describe('board list command', () => {
     expect(stdout).not.toContain('Boards')
     expect(stdout).not.toContain('Config:')
     expect(stdout).not.toContain('RPC URL:')
-    expect(stdout.trim()).toBe('a.eth')
+    expect(stdout.trim()).toBe('a.bso')
   })
 })

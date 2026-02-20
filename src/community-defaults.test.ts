@@ -245,7 +245,7 @@ describe('applyCommunityDefaultsToBoard', () => {
     const instance = createMockPlebbitInstance(subplebbit)
     mockConnect.mockResolvedValue(instance)
 
-    const result = await applyCommunityDefaultsToBoard('board.eth', 'ws://localhost:9138', {
+    const result = await applyCommunityDefaultsToBoard('board.bso', 'ws://localhost:9138', {
       boardSettings: {
         features: { noUpvotes: true, noDownvotes: true },
         settings: { fetchThumbnailUrls: false },
@@ -270,7 +270,7 @@ describe('applyCommunityDefaultsToBoard', () => {
     const instance = createMockPlebbitInstance(subplebbit)
     mockConnect.mockResolvedValue(instance)
 
-    const result = await applyCommunityDefaultsToBoard('board.eth', 'ws://localhost:9138', {
+    const result = await applyCommunityDefaultsToBoard('board.bso', 'ws://localhost:9138', {
       boardSettings: {
         features: { noUpvotes: true, noDownvotes: true },
         settings: { fetchThumbnailUrls: false },
@@ -289,7 +289,7 @@ describe('applyCommunityDefaultsToBoard', () => {
     const instance = { getSubplebbit, destroy } as unknown as PlebbitInstance
     mockConnect.mockResolvedValue(instance)
 
-    await expect(applyCommunityDefaultsToBoard('board.eth', 'ws://localhost:9138', {
+    await expect(applyCommunityDefaultsToBoard('board.bso', 'ws://localhost:9138', {
       boardSettings: {},
       boardManagerSettings: {},
     })).rejects.toThrow('lookup failed')

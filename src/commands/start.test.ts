@@ -81,30 +81,30 @@ describe('start command', () => {
 
   it('starts board managers with correct config', async () => {
     const manager = makeMockManager({
-      boardManagers: new Map([['a.eth', { stop: vi.fn() }]]),
+      boardManagers: new Map([['a.bso', { stop: vi.fn() }]]),
     })
     mockStartManager.mockResolvedValue(manager)
 
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'a.eth' })
+    writeBoardConfig(dir, { address: 'a.bso' })
 
     await runCommand([], dir)
 
     expect(mockStartManager).toHaveBeenCalledOnce()
     const [configDir, config] = mockStartManager.mock.calls[0]
     expect(configDir).toBe(dir)
-    expect(config.boards[0].address).toBe('a.eth')
+    expect(config.boards[0].address).toBe('a.bso')
   })
 
   it('uses custom config dir when --config-dir flag provided', async () => {
     const manager = makeMockManager({
-      boardManagers: new Map([['a.eth', { stop: vi.fn() }]]),
+      boardManagers: new Map([['a.bso', { stop: vi.fn() }]]),
     })
     mockStartManager.mockResolvedValue(manager)
 
     const dir = tmpDir()
     const customDir = join(dir, 'custom')
-    writeBoardConfig(customDir, { address: 'a.eth' })
+    writeBoardConfig(customDir, { address: 'a.bso' })
 
     await runCommand(['--config-dir', customDir], dir)
 
@@ -114,12 +114,12 @@ describe('start command', () => {
 
   it('prints startup summary', async () => {
     const manager = makeMockManager({
-      boardManagers: new Map([['a.eth', { stop: vi.fn() }]]),
+      boardManagers: new Map([['a.bso', { stop: vi.fn() }]]),
     })
     mockStartManager.mockResolvedValue(manager)
 
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'a.eth' })
+    writeBoardConfig(dir, { address: 'a.bso' })
 
     const { stdout } = await runCommand([], dir)
     expect(stdout).toContain('Starting board managers for 1 board(s)')
@@ -135,7 +135,7 @@ describe('start command', () => {
     )
 
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'a.eth' })
+    writeBoardConfig(dir, { address: 'a.bso' })
 
     await expect(runCommand([], dir)).rejects.toThrow(
       'All 1 board(s) failed to start',
@@ -144,18 +144,18 @@ describe('start command', () => {
 
   it('reports failed boards in startup summary', async () => {
     const manager = makeMockManager({
-      boardManagers: new Map([['a.eth', { stop: vi.fn() }]]),
-      errors: new Map([['b.eth', new Error('connection refused')]]),
+      boardManagers: new Map([['a.bso', { stop: vi.fn() }]]),
+      errors: new Map([['b.bso', new Error('connection refused')]]),
     })
     mockStartManager.mockResolvedValue(manager)
 
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'a.eth' })
-    writeBoardConfig(dir, { address: 'b.eth' })
+    writeBoardConfig(dir, { address: 'a.bso' })
+    writeBoardConfig(dir, { address: 'b.bso' })
 
     const { stdout, stderr } = await runCommand([], dir)
     expect(stdout).toContain('1 failed')
-    expect(stderr).toContain('FAILED: b.eth')
+    expect(stderr).toContain('FAILED: b.bso')
     expect(stderr).toContain('connection refused')
   })
 })

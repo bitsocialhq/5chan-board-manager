@@ -39,10 +39,10 @@ describe('loadMultiConfig', () => {
 
   it('loads a minimal valid config', () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'board.eth' })
+    writeBoardConfig(dir, { address: 'board.bso' })
     const config = loadMultiConfig(dir)
     expect(config.boards).toHaveLength(1)
-    expect(config.boards[0].address).toBe('board.eth')
+    expect(config.boards[0].address).toBe('board.bso')
     expect(config.rpcUrl).toBeUndefined()
     expect(config.stateDir).toBeUndefined()
     expect(config.defaults).toBeUndefined()
@@ -55,15 +55,15 @@ describe('loadMultiConfig', () => {
       stateDir: '/data/state',
       defaults: { perPage: 20, pages: 5, bumpLimit: 400, archivePurgeSeconds: 86400 },
     })
-    writeBoardConfig(dir, { address: 'a.eth' })
-    writeBoardConfig(dir, { address: 'b.eth', bumpLimit: 600 })
+    writeBoardConfig(dir, { address: 'a.bso' })
+    writeBoardConfig(dir, { address: 'b.bso', bumpLimit: 600 })
 
     const config = loadMultiConfig(dir)
     expect(config.rpcUrl).toBe('ws://custom:9138')
     expect(config.stateDir).toBe('/data/state')
     expect(config.defaults?.perPage).toBe(20)
     expect(config.boards).toHaveLength(2)
-    expect(config.boards.find((b) => b.address === 'b.eth')?.bumpLimit).toBe(600)
+    expect(config.boards.find((b) => b.address === 'b.bso')?.bumpLimit).toBe(600)
   })
 
   it('throws when no board files exist', () => {
@@ -96,86 +96,86 @@ describe('loadMultiConfig', () => {
 
   it('throws when a numeric field is not a positive integer', () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'x.eth', perPage: -1 })
+    writeBoardConfig(dir, { address: 'x.bso', perPage: -1 })
     expect(() => loadMultiConfig(dir)).toThrow('perPage must be a positive integer')
   })
 
   it('throws when a numeric field is a float', () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'x.eth', pages: 1.5 })
+    writeBoardConfig(dir, { address: 'x.bso', pages: 1.5 })
     expect(() => loadMultiConfig(dir)).toThrow('pages must be a positive integer')
   })
 
   it('throws when a numeric field is zero', () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'x.eth', bumpLimit: 0 })
+    writeBoardConfig(dir, { address: 'x.bso', bumpLimit: 0 })
     expect(() => loadMultiConfig(dir)).toThrow('bumpLimit must be a positive integer')
   })
 
   it('throws when a numeric field is a string', () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'x.eth', archivePurgeSeconds: '100' })
+    writeBoardConfig(dir, { address: 'x.bso', archivePurgeSeconds: '100' })
     expect(() => loadMultiConfig(dir)).toThrow('archivePurgeSeconds must be a positive integer')
   })
 
   it('throws when defaults has invalid numeric field', () => {
     const dir = tmpDir()
     writeGlobalConfig(dir, { defaults: { perPage: -5 } })
-    writeBoardConfig(dir, { address: 'x.eth' })
+    writeBoardConfig(dir, { address: 'x.bso' })
     expect(() => loadMultiConfig(dir)).toThrow('perPage must be a positive integer')
   })
 
   it('throws when rpcUrl is not a string', () => {
     const dir = tmpDir()
     writeGlobalConfig(dir, { rpcUrl: 123 })
-    writeBoardConfig(dir, { address: 'x.eth' })
+    writeBoardConfig(dir, { address: 'x.bso' })
     expect(() => loadMultiConfig(dir)).toThrow('"rpcUrl" must be a string')
   })
 
   it('throws when stateDir is not a string', () => {
     const dir = tmpDir()
     writeGlobalConfig(dir, { stateDir: true })
-    writeBoardConfig(dir, { address: 'x.eth' })
+    writeBoardConfig(dir, { address: 'x.bso' })
     expect(() => loadMultiConfig(dir)).toThrow('"stateDir" must be a string')
   })
 
   it('throws when defaults is not an object', () => {
     const dir = tmpDir()
     writeGlobalConfig(dir, { defaults: 'bad' })
-    writeBoardConfig(dir, { address: 'x.eth' })
+    writeBoardConfig(dir, { address: 'x.bso' })
     expect(() => loadMultiConfig(dir)).toThrow('"defaults" must be an object')
   })
 
   it('loads config with moderationReasons in defaults', () => {
     const dir = tmpDir()
     writeGlobalConfig(dir, { defaults: { moderationReasons: { archiveCapacity: 'custom' } } })
-    writeBoardConfig(dir, { address: 'x.eth' })
+    writeBoardConfig(dir, { address: 'x.bso' })
     const config = loadMultiConfig(dir)
     expect(config.defaults?.moderationReasons?.archiveCapacity).toBe('custom')
   })
 
   it('loads config with moderationReasons on a board', () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'x.eth', moderationReasons: { purgeDeleted: 'board reason' } })
+    writeBoardConfig(dir, { address: 'x.bso', moderationReasons: { purgeDeleted: 'board reason' } })
     const config = loadMultiConfig(dir)
     expect(config.boards[0].moderationReasons?.purgeDeleted).toBe('board reason')
   })
 
   it('rejects non-object moderationReasons', () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'x.eth', moderationReasons: 'bad' })
+    writeBoardConfig(dir, { address: 'x.bso', moderationReasons: 'bad' })
     expect(() => loadMultiConfig(dir)).toThrow('moderationReasons must be an object')
   })
 
   it('rejects unknown keys in moderationReasons', () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'x.eth', moderationReasons: { unknownKey: 'val' } })
+    writeBoardConfig(dir, { address: 'x.bso', moderationReasons: { unknownKey: 'val' } })
     expect(() => loadMultiConfig(dir)).toThrow('moderationReasons has unknown key "unknownKey"')
   })
 
   it('rejects non-string values in moderationReasons', () => {
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'x.eth', moderationReasons: { archiveCapacity: 123 } })
+    writeBoardConfig(dir, { address: 'x.bso', moderationReasons: { archiveCapacity: 123 } })
     expect(() => loadMultiConfig(dir)).toThrow('moderationReasons.archiveCapacity must be a string')
   })
 })
@@ -193,7 +193,7 @@ describe('resolveBoardManagerOptions', () => {
 
   it('uses config rpcUrl over env var and default', () => {
     process.env.PLEBBIT_RPC_WS_URL = 'ws://env:9138'
-    const board: BoardConfig = { address: 'a.eth' }
+    const board: BoardConfig = { address: 'a.bso' }
     const config: MultiBoardConfig = {
       rpcUrl: 'ws://config:9138',
       boards: [board],
@@ -204,7 +204,7 @@ describe('resolveBoardManagerOptions', () => {
 
   it('falls back to env var when rpcUrl not in config', () => {
     process.env.PLEBBIT_RPC_WS_URL = 'ws://env:9138'
-    const board: BoardConfig = { address: 'a.eth' }
+    const board: BoardConfig = { address: 'a.bso' }
     const config: MultiBoardConfig = { boards: [board] }
     const opts = resolveBoardManagerOptions(board, config)
     expect(opts.plebbitRpcUrl).toBe('ws://env:9138')
@@ -212,14 +212,14 @@ describe('resolveBoardManagerOptions', () => {
 
   it('falls back to default when neither config nor env var set', () => {
     delete process.env.PLEBBIT_RPC_WS_URL
-    const board: BoardConfig = { address: 'a.eth' }
+    const board: BoardConfig = { address: 'a.bso' }
     const config: MultiBoardConfig = { boards: [board] }
     const opts = resolveBoardManagerOptions(board, config)
     expect(opts.plebbitRpcUrl).toBe('ws://localhost:9138')
   })
 
   it('per-board values override defaults', () => {
-    const board: BoardConfig = { address: 'a.eth', bumpLimit: 500, perPage: 30 }
+    const board: BoardConfig = { address: 'a.bso', bumpLimit: 500, perPage: 30 }
     const config: MultiBoardConfig = {
       defaults: { bumpLimit: 300, perPage: 15, pages: 5 },
       boards: [board],
@@ -231,7 +231,7 @@ describe('resolveBoardManagerOptions', () => {
   })
 
   it('leaves unset fields as undefined so startArchiver uses its own defaults', () => {
-    const board: BoardConfig = { address: 'a.eth' }
+    const board: BoardConfig = { address: 'a.bso' }
     const config: MultiBoardConfig = { boards: [board] }
     const opts = resolveBoardManagerOptions(board, config)
     expect(opts.perPage).toBeUndefined()
@@ -242,7 +242,7 @@ describe('resolveBoardManagerOptions', () => {
   })
 
   it('passes stateDir from config', () => {
-    const board: BoardConfig = { address: 'a.eth' }
+    const board: BoardConfig = { address: 'a.bso' }
     const config: MultiBoardConfig = {
       stateDir: '/data/state',
       boards: [board],
@@ -252,15 +252,15 @@ describe('resolveBoardManagerOptions', () => {
   })
 
   it('sets subplebbitAddress from board address', () => {
-    const board: BoardConfig = { address: 'my-board.eth' }
+    const board: BoardConfig = { address: 'my-board.bso' }
     const config: MultiBoardConfig = { boards: [board] }
     const opts = resolveBoardManagerOptions(board, config)
-    expect(opts.subplebbitAddress).toBe('my-board.eth')
+    expect(opts.subplebbitAddress).toBe('my-board.bso')
   })
 
   it('merges moderationReasons per-field: board overrides default', () => {
     const board: BoardConfig = {
-      address: 'a.eth',
+      address: 'a.bso',
       moderationReasons: { archiveCapacity: 'board override' },
     }
     const config: MultiBoardConfig = {
@@ -278,7 +278,7 @@ describe('resolveBoardManagerOptions', () => {
   })
 
   it('returns undefined moderationReasons when neither board nor defaults set it', () => {
-    const board: BoardConfig = { address: 'a.eth' }
+    const board: BoardConfig = { address: 'a.bso' }
     const config: MultiBoardConfig = { boards: [board] }
     const opts = resolveBoardManagerOptions(board, config)
     expect(opts.moderationReasons).toBeUndefined()

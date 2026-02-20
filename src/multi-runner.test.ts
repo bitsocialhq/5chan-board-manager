@@ -16,7 +16,7 @@ function makeStopFn(): BoardManagerResult['stop'] {
 
 function makeConfig(overrides?: Partial<MultiBoardConfig>): MultiBoardConfig {
   return {
-    boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
+    boards: [{ address: 'a.bso' }, { address: 'b.bso' }],
     ...overrides,
   }
 }
@@ -36,8 +36,8 @@ describe('startMultiBoardManager', () => {
     const result = await startMultiBoardManager(makeConfig())
 
     expect(result.boardManagers.size).toBe(2)
-    expect(result.boardManagers.has('a.eth')).toBe(true)
-    expect(result.boardManagers.has('b.eth')).toBe(true)
+    expect(result.boardManagers.has('a.bso')).toBe(true)
+    expect(result.boardManagers.has('b.bso')).toBe(true)
     expect(result.errors.size).toBe(0)
   })
 
@@ -48,13 +48,13 @@ describe('startMultiBoardManager', () => {
       rpcUrl: 'ws://test:9138',
       stateDir: '/test/state',
       defaults: { perPage: 20 },
-      boards: [{ address: 'x.eth', bumpLimit: 500 }],
+      boards: [{ address: 'x.bso', bumpLimit: 500 }],
     })
 
     await startMultiBoardManager(config)
 
     const opts = mockStartBoardManager.mock.calls[0][0] as BoardManagerOptions
-    expect(opts.subplebbitAddress).toBe('x.eth')
+    expect(opts.subplebbitAddress).toBe('x.bso')
     expect(opts.plebbitRpcUrl).toBe('ws://test:9138')
     expect(opts.stateDir).toBe('/test/state')
     expect(opts.perPage).toBe(20)
@@ -69,9 +69,9 @@ describe('startMultiBoardManager', () => {
     const result = await startMultiBoardManager(makeConfig())
 
     expect(result.boardManagers.size).toBe(1)
-    expect(result.boardManagers.has('b.eth')).toBe(true)
+    expect(result.boardManagers.has('b.bso')).toBe(true)
     expect(result.errors.size).toBe(1)
-    expect(result.errors.get('a.eth')?.message).toBe('connection refused')
+    expect(result.errors.get('a.bso')?.message).toBe('connection refused')
   })
 
   it('throws AggregateError when ALL boards fail', async () => {
@@ -105,10 +105,10 @@ describe('startMultiBoardManager', () => {
     })
 
     await startMultiBoardManager(makeConfig({
-      boards: [{ address: 'first.eth' }, { address: 'second.eth' }, { address: 'third.eth' }],
+      boards: [{ address: 'first.bso' }, { address: 'second.bso' }, { address: 'third.bso' }],
     }))
 
-    expect(order).toEqual(['first.eth', 'second.eth', 'third.eth'])
+    expect(order).toEqual(['first.bso', 'second.bso', 'third.bso'])
   })
 
   describe('stop()', () => {
@@ -149,6 +149,6 @@ describe('startMultiBoardManager', () => {
 
     const result = await startMultiBoardManager(makeConfig())
 
-    expect(result.errors.get('a.eth')?.message).toBe('string error')
+    expect(result.errors.get('a.bso')?.message).toBe('string error')
   })
 })

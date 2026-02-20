@@ -60,17 +60,17 @@ describe('startBoardManagers', () => {
       .mockResolvedValueOnce({ stop: stopB })
 
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'a.eth' })
-    writeBoardConfig(dir, { address: 'b.eth' })
+    writeBoardConfig(dir, { address: 'a.bso' })
+    writeBoardConfig(dir, { address: 'b.bso' })
     const config: MultiBoardConfig = {
-      boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
+      boards: [{ address: 'a.bso' }, { address: 'b.bso' }],
     }
 
     const manager = await startBoardManagers(dir, config)
 
     expect(manager.boardManagers.size).toBe(2)
-    expect(manager.boardManagers.has('a.eth')).toBe(true)
-    expect(manager.boardManagers.has('b.eth')).toBe(true)
+    expect(manager.boardManagers.has('a.bso')).toBe(true)
+    expect(manager.boardManagers.has('b.bso')).toBe(true)
     expect(manager.errors.size).toBe(0)
 
     await manager.stop()
@@ -82,18 +82,18 @@ describe('startBoardManagers', () => {
       .mockResolvedValueOnce({ stop: makeStopFn() })
 
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'a.eth' })
-    writeBoardConfig(dir, { address: 'b.eth' })
+    writeBoardConfig(dir, { address: 'a.bso' })
+    writeBoardConfig(dir, { address: 'b.bso' })
     const config: MultiBoardConfig = {
-      boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
+      boards: [{ address: 'a.bso' }, { address: 'b.bso' }],
     }
 
     const manager = await startBoardManagers(dir, config)
 
     expect(manager.boardManagers.size).toBe(1)
-    expect(manager.boardManagers.has('b.eth')).toBe(true)
+    expect(manager.boardManagers.has('b.bso')).toBe(true)
     expect(manager.errors.size).toBe(1)
-    expect(manager.errors.get('a.eth')?.message).toBe('connection refused')
+    expect(manager.errors.get('a.bso')?.message).toBe('connection refused')
 
     await manager.stop()
   })
@@ -104,10 +104,10 @@ describe('startBoardManagers', () => {
       .mockRejectedValueOnce(new Error('timeout'))
 
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'a.eth' })
-    writeBoardConfig(dir, { address: 'b.eth' })
+    writeBoardConfig(dir, { address: 'a.bso' })
+    writeBoardConfig(dir, { address: 'b.bso' })
     const config: MultiBoardConfig = {
-      boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
+      boards: [{ address: 'a.bso' }, { address: 'b.bso' }],
     }
 
     await expect(startBoardManagers(dir, config)).rejects.toThrow(
@@ -132,18 +132,18 @@ describe('startBoardManagers', () => {
     mockStartBoardManager.mockResolvedValue({ stop: makeStopFn() })
 
     const dir = tmpDir()
-    writeBoardConfig(dir, { address: 'x.eth', bumpLimit: 500 })
+    writeBoardConfig(dir, { address: 'x.bso', bumpLimit: 500 })
     const config: MultiBoardConfig = {
       rpcUrl: 'ws://test:9138',
       stateDir: '/test/state',
       defaults: { perPage: 20 },
-      boards: [{ address: 'x.eth', bumpLimit: 500 }],
+      boards: [{ address: 'x.bso', bumpLimit: 500 }],
     }
 
     const manager = await startBoardManagers(dir, config)
 
     const opts = mockStartBoardManager.mock.calls[0][0] as BoardManagerOptions
-    expect(opts.subplebbitAddress).toBe('x.eth')
+    expect(opts.subplebbitAddress).toBe('x.bso')
     expect(opts.plebbitRpcUrl).toBe('ws://test:9138')
     expect(opts.stateDir).toBe('/test/state')
     expect(opts.perPage).toBe(20)
@@ -161,22 +161,22 @@ describe('startBoardManagers', () => {
         .mockResolvedValueOnce({ stop: stopNew })
 
       const dir = tmpDir()
-      writeBoardConfig(dir, { address: 'a.eth' })
+      writeBoardConfig(dir, { address: 'a.bso' })
       const config: MultiBoardConfig = {
-        boards: [{ address: 'a.eth' }],
+        boards: [{ address: 'a.bso' }],
       }
 
       const manager = await startBoardManagers(dir, config)
       expect(manager.boardManagers.size).toBe(1)
 
       // Add new board config file
-      writeBoardConfig(dir, { address: 'new.eth' })
+      writeBoardConfig(dir, { address: 'new.bso' })
 
       // Wait for debounce + async handling
       await new Promise((r) => setTimeout(r, 500))
 
       expect(manager.boardManagers.size).toBe(2)
-      expect(manager.boardManagers.has('new.eth')).toBe(true)
+      expect(manager.boardManagers.has('new.bso')).toBe(true)
 
       await manager.stop()
     })
@@ -189,16 +189,16 @@ describe('startBoardManagers', () => {
         .mockResolvedValueOnce({ stop: stopNew })
 
       const dir = tmpDir()
-      writeBoardConfig(dir, { address: 'a.eth', bumpLimit: 300 })
+      writeBoardConfig(dir, { address: 'a.bso', bumpLimit: 300 })
       const config: MultiBoardConfig = {
-        boards: [{ address: 'a.eth', bumpLimit: 300 }],
+        boards: [{ address: 'a.bso', bumpLimit: 300 }],
       }
 
       const manager = await startBoardManagers(dir, config)
       expect(manager.boardManagers.size).toBe(1)
 
       // Update board config file with changed bumpLimit
-      writeBoardConfig(dir, { address: 'a.eth', bumpLimit: 500 })
+      writeBoardConfig(dir, { address: 'a.bso', bumpLimit: 500 })
 
       // Wait for debounce + async handling
       await new Promise((r) => setTimeout(r, 500))
@@ -206,7 +206,7 @@ describe('startBoardManagers', () => {
       expect(stopA).toHaveBeenCalledOnce()
       expect(mockStartBoardManager).toHaveBeenCalledTimes(2)
       expect(manager.boardManagers.size).toBe(1)
-      expect(manager.boardManagers.has('a.eth')).toBe(true)
+      expect(manager.boardManagers.has('a.bso')).toBe(true)
 
       await manager.stop()
     })
@@ -218,24 +218,24 @@ describe('startBoardManagers', () => {
         .mockRejectedValueOnce(new Error('restart failed'))
 
       const dir = tmpDir()
-      writeBoardConfig(dir, { address: 'a.eth', bumpLimit: 300 })
+      writeBoardConfig(dir, { address: 'a.bso', bumpLimit: 300 })
       const config: MultiBoardConfig = {
-        boards: [{ address: 'a.eth', bumpLimit: 300 }],
+        boards: [{ address: 'a.bso', bumpLimit: 300 }],
       }
 
       const manager = await startBoardManagers(dir, config)
       expect(manager.boardManagers.size).toBe(1)
 
       // Update board config file with changed bumpLimit
-      writeBoardConfig(dir, { address: 'a.eth', bumpLimit: 500 })
+      writeBoardConfig(dir, { address: 'a.bso', bumpLimit: 500 })
 
       // Wait for debounce + async handling
       await new Promise((r) => setTimeout(r, 500))
 
       expect(stopA).toHaveBeenCalledOnce()
-      expect(manager.boardManagers.has('a.eth')).toBe(false)
+      expect(manager.boardManagers.has('a.bso')).toBe(false)
       expect(manager.errors.size).toBe(1)
-      expect(manager.errors.get('a.eth')?.message).toBe('restart failed')
+      expect(manager.errors.get('a.bso')?.message).toBe('restart failed')
 
       await manager.stop()
     })
@@ -248,24 +248,24 @@ describe('startBoardManagers', () => {
         .mockResolvedValueOnce({ stop: stopB })
 
       const dir = tmpDir()
-      writeBoardConfig(dir, { address: 'a.eth' })
-      writeBoardConfig(dir, { address: 'b.eth' })
+      writeBoardConfig(dir, { address: 'a.bso' })
+      writeBoardConfig(dir, { address: 'b.bso' })
       const config: MultiBoardConfig = {
-        boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
+        boards: [{ address: 'a.bso' }, { address: 'b.bso' }],
       }
 
       const manager = await startBoardManagers(dir, config)
       expect(manager.boardManagers.size).toBe(2)
 
       // Remove board config file
-      unlinkSync(join(dir, 'boards', 'b.eth.json'))
+      unlinkSync(join(dir, 'boards', 'b.bso.json'))
 
       // Wait for debounce + async handling
       await new Promise((r) => setTimeout(r, 500))
 
       expect(manager.boardManagers.size).toBe(1)
-      expect(manager.boardManagers.has('a.eth')).toBe(true)
-      expect(manager.boardManagers.has('b.eth')).toBe(false)
+      expect(manager.boardManagers.has('a.bso')).toBe(true)
+      expect(manager.boardManagers.has('b.bso')).toBe(false)
       expect(stopB).toHaveBeenCalledOnce()
 
       await manager.stop()
@@ -281,10 +281,10 @@ describe('startBoardManagers', () => {
         .mockResolvedValueOnce({ stop: stopB })
 
       const dir = tmpDir()
-      writeBoardConfig(dir, { address: 'a.eth' })
-      writeBoardConfig(dir, { address: 'b.eth' })
+      writeBoardConfig(dir, { address: 'a.bso' })
+      writeBoardConfig(dir, { address: 'b.bso' })
       const config: MultiBoardConfig = {
-        boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
+        boards: [{ address: 'a.bso' }, { address: 'b.bso' }],
       }
 
       const manager = await startBoardManagers(dir, config)
@@ -302,10 +302,10 @@ describe('startBoardManagers', () => {
         .mockResolvedValueOnce({ stop: stopB })
 
       const dir = tmpDir()
-      writeBoardConfig(dir, { address: 'a.eth' })
-      writeBoardConfig(dir, { address: 'b.eth' })
+      writeBoardConfig(dir, { address: 'a.bso' })
+      writeBoardConfig(dir, { address: 'b.bso' })
       const config: MultiBoardConfig = {
-        boards: [{ address: 'a.eth' }, { address: 'b.eth' }],
+        boards: [{ address: 'a.bso' }, { address: 'b.bso' }],
       }
 
       const manager = await startBoardManagers(dir, config)

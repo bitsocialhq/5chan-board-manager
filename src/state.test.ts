@@ -26,7 +26,7 @@ describe('state', () => {
 
     it('loads existing state from file', () => {
       const existing: BoardManagerState = {
-        signers: { 'sub1.eth': { privateKey: 'pk123' } },
+        signers: { 'sub1.bso': { privateKey: 'pk123' } },
         archivedThreads: { 'Qm123': { archivedTimestamp: 1000 } },
       }
       saveState(statePath, existing)
@@ -45,7 +45,7 @@ describe('state', () => {
   describe('saveState', () => {
     it('writes state as JSON', () => {
       const state: BoardManagerState = {
-        signers: { 'board.eth': { privateKey: 'abc' } },
+        signers: { 'board.bso': { privateKey: 'abc' } },
         archivedThreads: {},
       }
       saveState(statePath, state)
@@ -74,8 +74,8 @@ describe('state', () => {
     it('preserves both signers and archivedThreads', () => {
       const state: BoardManagerState = {
         signers: {
-          'sub1.eth': { privateKey: 'key1' },
-          'sub2.eth': { privateKey: 'key2' },
+          'sub1.bso': { privateKey: 'key1' },
+          'sub2.bso': { privateKey: 'key2' },
         },
         archivedThreads: {
           'QmA': { archivedTimestamp: 1000 },
@@ -109,7 +109,7 @@ describe('state', () => {
 
     it('preserves original state when a leftover .tmp file exists', () => {
       const state: BoardManagerState = {
-        signers: { 'x.eth': { privateKey: 'original' } },
+        signers: { 'x.bso': { privateKey: 'original' } },
         archivedThreads: {},
       }
       saveState(statePath, state)
@@ -118,7 +118,7 @@ describe('state', () => {
       writeFileSync(statePath + '.tmp', 'garbage')
 
       const loaded = loadState(statePath)
-      expect(loaded.signers['x.eth'].privateKey).toBe('original')
+      expect(loaded.signers['x.bso'].privateKey).toBe('original')
     })
 
     it('overwrites leftover .tmp on next successful save', () => {

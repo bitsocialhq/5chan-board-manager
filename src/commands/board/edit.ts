@@ -30,13 +30,13 @@ To edit board settings (title, description, rules, etc.), use a WebUI or bitsoci
 https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address`
 
   static override examples = [
-    '5chan board edit tech.eth --bump-limit 500',
-    '5chan board edit flash.eth --per-page 30 --pages 1',
-    '5chan board edit random.eth --reset per-page,bump-limit',
-    '5chan board edit random.eth --per-page 20 --reset bump-limit',
-    '5chan board edit random.eth --reset moderation-reasons',
-    '5chan board edit random.eth --interactive',
-    '5chan board edit random.eth -i',
+    '5chan board edit tech.bso --bump-limit 500',
+    '5chan board edit flash.bso --per-page 30 --pages 1',
+    '5chan board edit random.bso --reset per-page,bump-limit',
+    '5chan board edit random.bso --per-page 20 --reset bump-limit',
+    '5chan board edit random.bso --reset moderation-reasons',
+    '5chan board edit random.bso --interactive',
+    '5chan board edit random.bso -i',
   ]
 
   static override flags = {

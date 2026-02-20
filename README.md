@@ -33,10 +33,10 @@ Config is stored as one file per board under `~/.config/5chan/`, managed via `5c
 ~/.config/5chan/
 ├── global.json              # shared settings (rpcUrl, stateDir, defaults)
 └── boards/
-    ├── random.eth.json      # { "address": "random.eth" }
-    ├── tech.eth.json        # { "address": "tech.eth", "bumpLimit": 500 }
-    ├── flash.eth.json       # { "address": "flash.eth", "perPage": 30, "pages": 1 }
-    └── custom.eth.json      # { "address": "custom.eth", "moderationReasons": { ... } }
+    ├── random.bso.json      # { "address": "random.bso" }
+    ├── tech.bso.json        # { "address": "tech.bso", "bumpLimit": 500 }
+    ├── flash.bso.json       # { "address": "flash.bso", "perPage": 30, "pages": 1 }
+    └── custom.bso.json      # { "address": "custom.bso", "moderationReasons": { ... } }
 ```
 
 **global.json** (optional):
@@ -59,7 +59,7 @@ Config is stored as one file per board under `~/.config/5chan/`, managed via `5c
 }
 ```
 
-**Minimal config:** a single file `boards/my-board.eth.json` containing `{ "address": "my-board.eth" }`
+**Minimal config:** a single file `boards/my-board.bso.json` containing `{ "address": "my-board.bso" }`
 
 All fields except each board's `address` are optional:
 - `rpcUrl` — falls back to `PLEBBIT_RPC_WS_URL` env var, then `ws://localhost:9138`
@@ -129,25 +129,25 @@ Use `docker compose exec` to run additional `5chan` CLI commands inside the runn
 
 ```bash
 # Add a board
-docker compose exec 5chan 5chan board add random.eth
+docker compose exec 5chan 5chan board add random.bso
 
 # List configured boards
 docker compose exec 5chan 5chan board list
 
 # Edit a board's config
-docker compose exec 5chan 5chan board edit random.eth --bump-limit 500
+docker compose exec 5chan 5chan board edit random.bso --bump-limit 500
 
 # Open a board's config in $EDITOR for interactive editing
-docker compose exec 5chan 5chan board edit random.eth -i
+docker compose exec 5chan 5chan board edit random.bso -i
 
 # Reset a board field to global default
-docker compose exec 5chan 5chan board edit random.eth --reset per-page
+docker compose exec 5chan 5chan board edit random.bso --reset per-page
 
 # Reset moderation reasons to defaults
-docker compose exec 5chan 5chan board edit random.eth --reset moderation-reasons
+docker compose exec 5chan 5chan board edit random.bso --reset moderation-reasons
 
 # Remove a board
-docker compose exec 5chan 5chan board remove random.eth
+docker compose exec 5chan 5chan board remove random.bso
 ```
 
 The container auto-reloads when files in the config directory change, so boards added/edited via `5chan board add/edit` take effect immediately without restarting.
@@ -238,21 +238,21 @@ DESCRIPTION
   https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address
 
 EXAMPLES
-  $ 5chan board add random.eth
+  $ 5chan board add random.bso
 
-  $ 5chan board add tech.eth --bump-limit 500
+  $ 5chan board add tech.bso --bump-limit 500
 
-  $ 5chan board add flash.eth --per-page 30 --pages 1
+  $ 5chan board add flash.bso --per-page 30 --pages 1
 
-  $ 5chan board add my-board.eth --rpc-url ws://custom-host:9138
+  $ 5chan board add my-board.bso --rpc-url ws://custom-host:9138
 
-  $ 5chan board add my-board.eth --apply-defaults
+  $ 5chan board add my-board.bso --apply-defaults
 
-  $ 5chan board add my-board.eth --skip-apply-defaults
+  $ 5chan board add my-board.bso --skip-apply-defaults
 
-  $ 5chan board add my-board.eth --interactive-apply-defaults
+  $ 5chan board add my-board.bso --interactive-apply-defaults
 
-  $ 5chan board add my-board.eth --apply-defaults --defaults-preset ./my-preset.json
+  $ 5chan board add my-board.bso --apply-defaults --defaults-preset ./my-preset.json
 ```
 
 _See code: [src/commands/board/add.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.0/src/commands/board/add.ts)_
@@ -287,19 +287,19 @@ DESCRIPTION
   https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address
 
 EXAMPLES
-  $ 5chan board edit tech.eth --bump-limit 500
+  $ 5chan board edit tech.bso --bump-limit 500
 
-  $ 5chan board edit flash.eth --per-page 30 --pages 1
+  $ 5chan board edit flash.bso --per-page 30 --pages 1
 
-  $ 5chan board edit random.eth --reset per-page,bump-limit
+  $ 5chan board edit random.bso --reset per-page,bump-limit
 
-  $ 5chan board edit random.eth --per-page 20 --reset bump-limit
+  $ 5chan board edit random.bso --per-page 20 --reset bump-limit
 
-  $ 5chan board edit random.eth --reset moderation-reasons
+  $ 5chan board edit random.bso --reset moderation-reasons
 
-  $ 5chan board edit random.eth --interactive
+  $ 5chan board edit random.bso --interactive
 
-  $ 5chan board edit random.eth -i
+  $ 5chan board edit random.bso -i
 ```
 
 _See code: [src/commands/board/edit.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.0/src/commands/board/edit.ts)_
@@ -338,7 +338,7 @@ DESCRIPTION
   Remove a board from the config
 
 EXAMPLES
-  $ 5chan board remove random.eth
+  $ 5chan board remove random.bso
 ```
 
 _See code: [src/commands/board/remove.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.0/src/commands/board/remove.ts)_

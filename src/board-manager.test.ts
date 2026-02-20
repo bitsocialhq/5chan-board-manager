@@ -262,32 +262,32 @@ describe('board manager logic', () => {
     it('persists signer to state file', () => {
       const filePath = join(stateDir, 'test.json')
       const state: BoardManagerState = { signers: {}, archivedThreads: {} }
-      state.signers['my-board.eth'] = { privateKey: 'test-private-key' }
+      state.signers['my-board.bso'] = { privateKey: 'test-private-key' }
       saveState(filePath, state)
 
       const loaded = loadState(filePath)
-      expect(loaded.signers['my-board.eth'].privateKey).toBe('test-private-key')
+      expect(loaded.signers['my-board.bso'].privateKey).toBe('test-private-key')
     })
 
     it('retrieves existing signer from state', () => {
       const filePath = join(stateDir, 'test.json')
       const state: BoardManagerState = {
-        signers: { 'board.eth': { privateKey: 'existing-key' } },
+        signers: { 'board.bso': { privateKey: 'existing-key' } },
         archivedThreads: {},
       }
       saveState(filePath, state)
 
       const loaded = loadState(filePath)
-      expect(loaded.signers['board.eth']).toBeDefined()
-      expect(loaded.signers['board.eth'].privateKey).toBe('existing-key')
+      expect(loaded.signers['board.bso']).toBeDefined()
+      expect(loaded.signers['board.bso'].privateKey).toBe('existing-key')
     })
 
     it('handles multiple signers for different subplebbits', () => {
       const filePath = join(stateDir, 'test.json')
       const state: BoardManagerState = {
         signers: {
-          'board1.eth': { privateKey: 'key1' },
-          'board2.eth': { privateKey: 'key2' },
+          'board1.bso': { privateKey: 'key1' },
+          'board2.bso': { privateKey: 'key2' },
         },
         archivedThreads: {},
       }
@@ -295,8 +295,8 @@ describe('board manager logic', () => {
 
       const loaded = loadState(filePath)
       expect(Object.keys(loaded.signers)).toHaveLength(2)
-      expect(loaded.signers['board1.eth'].privateKey).toBe('key1')
-      expect(loaded.signers['board2.eth'].privateKey).toBe('key2')
+      expect(loaded.signers['board1.bso'].privateKey).toBe('key1')
+      expect(loaded.signers['board2.bso'].privateKey).toBe('key2')
     })
   })
 
@@ -340,13 +340,13 @@ describe('board manager logic', () => {
       const mod = await instance.createCommentModeration({
         commentCid: 'QmTest',
         commentModeration: { archived: true },
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         signer: { address: 'addr', privateKey: 'pk', type: 'ed25519' },
       })
       expect(instance.createCommentModeration).toHaveBeenCalledWith({
         commentCid: 'QmTest',
         commentModeration: { archived: true },
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         signer: { address: 'addr', privateKey: 'pk', type: 'ed25519' },
       })
       expect(mod.publish).toBeDefined()
@@ -357,7 +357,7 @@ describe('board manager logic', () => {
       const mod = await instance.createCommentModeration({
         commentCid: 'QmTest',
         commentModeration: { purged: true },
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         signer: { address: 'addr', privateKey: 'pk', type: 'ed25519' },
       })
       expect(mod.commentModeration.purged).toBe(true)
@@ -368,7 +368,7 @@ describe('board manager logic', () => {
       const mod = await instance.createCommentModeration({
         commentCid: 'QmTest',
         commentModeration: { archived: true },
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         signer: { address: 'addr', privateKey: 'pk', type: 'ed25519' },
       })
       await mod.publish()
@@ -387,7 +387,7 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
         perPage: 15,
@@ -415,7 +415,7 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
         perPage: 2,
@@ -451,7 +451,7 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
         perPage: 1,
@@ -492,7 +492,7 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
         perPage: 1,
@@ -538,7 +538,7 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
         perPage: 1,
@@ -560,7 +560,7 @@ describe('board manager logic', () => {
 
     it('throws for remote subplebbit when signer has no mod role', async () => {
       const { instance } = createMockPlebbit()
-      // subplebbits is empty → board.eth is remote
+      // subplebbits is empty → board.bso is remote
       ;(instance as unknown as { subplebbits: string[] }).subplebbits = []
 
       const mockSub = createMockSubplebbit({
@@ -572,17 +572,17 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       await expect(startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
       })).rejects.toThrow(
-        'Signer mock-address-123 does not have a moderator role on remote subplebbit board.eth. Ask the subplebbit owner to add this address as a moderator.'
+        'Signer mock-address-123 does not have a moderator role on remote subplebbit board.bso. Ask the subplebbit owner to add this address as a moderator.'
       )
     })
 
     it('starts successfully for remote subplebbit when signer has mod role', async () => {
       const { instance } = createMockPlebbit()
-      // subplebbits is empty → board.eth is remote
+      // subplebbits is empty → board.bso is remote
       ;(instance as unknown as { subplebbits: string[] }).subplebbits = []
 
       const mockSub = createMockSubplebbit({
@@ -594,7 +594,7 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
       })
@@ -606,8 +606,8 @@ describe('board manager logic', () => {
 
     it('auto-grants mod role for local subplebbit without mod role', async () => {
       const { instance } = createMockPlebbit()
-      // subplebbits includes board.eth → it's local
-      ;(instance as unknown as { subplebbits: string[] }).subplebbits = ['board.eth']
+      // subplebbits includes board.bso → it's local
+      ;(instance as unknown as { subplebbits: string[] }).subplebbits = ['board.bso']
 
       const mockSub = createMockSubplebbit({
         pageCids: {},
@@ -618,7 +618,7 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
       })
@@ -640,7 +640,7 @@ describe('board manager logic', () => {
 
       // No stateDir passed — should use defaultStateDir() without error
       const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         perPage: 15,
         pages: 10,
@@ -676,7 +676,7 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
         perPage: 15,
@@ -731,7 +731,7 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
         perPage: 15,
@@ -754,7 +754,7 @@ describe('board manager logic', () => {
   describe('process lock', () => {
     it('throws when lock is held by a live PID', async () => {
       mkdirSync(stateDir, { recursive: true })
-      const lockPath = join(stateDir, 'board.eth.json.lock')
+      const lockPath = join(stateDir, 'board.bso.json.lock')
       writeFileSync(lockPath, String(process.pid))
 
       const { instance } = createMockPlebbit()
@@ -762,15 +762,15 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       await expect(startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
-      })).rejects.toThrow(`Another board manager (PID ${process.pid}) is already running for board.eth`)
+      })).rejects.toThrow(`Another board manager (PID ${process.pid}) is already running for board.bso`)
     })
 
     it('succeeds when lock has stale PID', async () => {
       mkdirSync(stateDir, { recursive: true })
-      const lockPath = join(stateDir, 'board.eth.json.lock')
+      const lockPath = join(stateDir, 'board.bso.json.lock')
       writeFileSync(lockPath, '999999')
 
       const { instance } = createMockPlebbit()
@@ -778,7 +778,7 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
       })
@@ -793,12 +793,12 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
       })
 
-      const lockPath = join(stateDir, 'board.eth.json.lock')
+      const lockPath = join(stateDir, 'board.bso.json.lock')
       expect(existsSync(lockPath)).toBe(true)
 
       await boardManager.stop()
@@ -811,10 +811,10 @@ describe('board manager logic', () => {
       const mockSub = createMockSubplebbit({ pageCids: {}, pages: {} })
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      const lockPath = join(stateDir, 'board.eth.json.lock')
+      const lockPath = join(stateDir, 'board.bso.json.lock')
 
       const boardManager1 = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
       })
@@ -828,7 +828,7 @@ describe('board manager logic', () => {
       vi.mocked(instance2.getSubplebbit).mockResolvedValue(mockSub2 as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager2 = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
       })
@@ -858,7 +858,7 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
         perPage: 15,
@@ -872,7 +872,7 @@ describe('board manager logic', () => {
 
       const purges = publishedModerations.filter((m) => m.commentModeration.purged === true)
       expect(purges[0].commentCid).toBe('QmDeleted')
-      expect(purges[0].subplebbitAddress).toBe('board.eth')
+      expect(purges[0].subplebbitAddress).toBe('board.bso')
       expect(purges[0].signer).toBeDefined()
       expect(purges[0].commentModeration).toEqual({ purged: true, reason: '5chan board manager: content purged — author-deleted' })
 
@@ -881,7 +881,7 @@ describe('board manager logic', () => {
         expect.objectContaining({
           commentCid: 'QmDeleted',
           commentModeration: { purged: true, reason: '5chan board manager: content purged — author-deleted' },
-          subplebbitAddress: 'board.eth',
+          subplebbitAddress: 'board.bso',
         })
       )
       await boardManager.stop()
@@ -918,7 +918,7 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
         perPage: 15,
@@ -932,7 +932,7 @@ describe('board manager logic', () => {
 
       const purges = publishedModerations.filter((m) => m.commentModeration.purged === true)
       expect(purges[0].commentCid).toBe('QmReply2')
-      expect(purges[0].subplebbitAddress).toBe('board.eth')
+      expect(purges[0].subplebbitAddress).toBe('board.bso')
       expect(purges[0].signer).toBeDefined()
       expect(purges[0].commentModeration).toEqual({ purged: true, reason: '5chan board manager: content purged — author-deleted' })
       await boardManager.stop()
@@ -956,14 +956,14 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       // Pre-seed state with thread in archivedThreads (recent timestamp to avoid archive-purge)
-      const statePath = join(stateDir, 'board.eth.json')
+      const statePath = join(stateDir, 'board.bso.json')
       saveState(statePath, {
         signers: {},
         archivedThreads: { 'QmArchived': { archivedTimestamp: Math.floor(Date.now() / 1000) } },
       })
 
       const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
         perPage: 15,
@@ -999,7 +999,7 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
         perPage: 15,
@@ -1035,7 +1035,7 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
         perPage: 2,
@@ -1068,7 +1068,7 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
         perPage: 1,
@@ -1106,7 +1106,7 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
         perPage: 15,
@@ -1141,14 +1141,14 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       // Pre-seed state with an old archived thread
-      const statePath = join(stateDir, 'board.eth.json')
+      const statePath = join(stateDir, 'board.bso.json')
       saveState(statePath, {
         signers: {},
         archivedThreads: { 'QmOldArchived': { archivedTimestamp: 0 } },
       })
 
       const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
         perPage: 15,
@@ -1187,7 +1187,7 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.eth',
+        subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
         perPage: 15,
@@ -1210,7 +1210,7 @@ describe('board manager logic', () => {
 
   describe('per-subplebbit state isolation', () => {
     it('two board managers for different subplebbits use separate state files', async () => {
-      // First board manager for board1.eth
+      // First board manager for board1.bso
       const { instance: instance1 } = createMockPlebbit()
       const mockSub1 = createMockSubplebbit({
         pageCids: { active: 'QmPage1' },
@@ -1223,14 +1223,14 @@ describe('board manager logic', () => {
       vi.mocked(instance1.getSubplebbit).mockResolvedValue(mockSub1 as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager1 = await startBoardManager({
-        subplebbitAddress: 'board1.eth',
+        subplebbitAddress: 'board1.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
         perPage: 15,
         pages: 10,
       })
 
-      // Second board manager for board2.eth
+      // Second board manager for board2.bso
       const { instance: instance2 } = createMockPlebbit()
       const mockSub2 = createMockSubplebbit({
         pageCids: { active: 'QmPage2' },
@@ -1243,7 +1243,7 @@ describe('board manager logic', () => {
       vi.mocked(instance2.getSubplebbit).mockResolvedValue(mockSub2 as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager2 = await startBoardManager({
-        subplebbitAddress: 'board2.eth',
+        subplebbitAddress: 'board2.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
         stateDir,
         perPage: 15,
@@ -1252,20 +1252,20 @@ describe('board manager logic', () => {
 
       // Wait for both board managers to process
       await vi.waitFor(() => {
-        expect(existsSync(join(stateDir, 'board1.eth.json'))).toBe(true)
-        expect(existsSync(join(stateDir, 'board2.eth.json'))).toBe(true)
+        expect(existsSync(join(stateDir, 'board1.bso.json'))).toBe(true)
+        expect(existsSync(join(stateDir, 'board2.bso.json'))).toBe(true)
       })
 
       // Verify each state file has its own signer and they don't clobber each other
-      const state1 = loadState(join(stateDir, 'board1.eth.json'))
-      const state2 = loadState(join(stateDir, 'board2.eth.json'))
+      const state1 = loadState(join(stateDir, 'board1.bso.json'))
+      const state2 = loadState(join(stateDir, 'board2.bso.json'))
 
-      expect(state1.signers['board1.eth']).toBeDefined()
-      expect(state2.signers['board2.eth']).toBeDefined()
+      expect(state1.signers['board1.bso']).toBeDefined()
+      expect(state2.signers['board2.bso']).toBeDefined()
 
       // Each file only has its own subplebbit's signer
-      expect(state1.signers['board2.eth']).toBeUndefined()
-      expect(state2.signers['board1.eth']).toBeUndefined()
+      expect(state1.signers['board2.bso']).toBeUndefined()
+      expect(state2.signers['board1.bso']).toBeUndefined()
 
       await boardManager1.stop()
       await boardManager2.stop()

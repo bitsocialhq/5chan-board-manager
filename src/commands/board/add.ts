@@ -44,14 +44,14 @@ To set board settings (title, description, rules, etc.), use a WebUI or bitsocia
 https://github.com/bitsocialhq/bitsocial-cli#bitsocial-community-edit-address`
 
   static override examples = [
-    '5chan board add random.eth',
-    '5chan board add tech.eth --bump-limit 500',
-    '5chan board add flash.eth --per-page 30 --pages 1',
-    '5chan board add my-board.eth --rpc-url ws://custom-host:9138',
-    '5chan board add my-board.eth --apply-defaults',
-    '5chan board add my-board.eth --skip-apply-defaults',
-    '5chan board add my-board.eth --interactive-apply-defaults',
-    '5chan board add my-board.eth --apply-defaults --defaults-preset ./my-preset.json',
+    '5chan board add random.bso',
+    '5chan board add tech.bso --bump-limit 500',
+    '5chan board add flash.bso --per-page 30 --pages 1',
+    '5chan board add my-board.bso --rpc-url ws://custom-host:9138',
+    '5chan board add my-board.bso --apply-defaults',
+    '5chan board add my-board.bso --skip-apply-defaults',
+    '5chan board add my-board.bso --interactive-apply-defaults',
+    '5chan board add my-board.bso --apply-defaults --defaults-preset ./my-preset.json',
   ]
 
   static override flags = {

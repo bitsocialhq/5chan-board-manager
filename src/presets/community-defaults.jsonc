@@ -1,4 +1,27 @@
 {
+  // Board manager settings — controls pagination, thread lifecycle, and auto-moderation
+  "boardManagerSettings": {
+    // Number of threads shown per page
+    "perPage": 15,
+    // Number of pages on the board. Total thread capacity = perPage x pages
+    "pages": 10,
+    // Max replies before a thread stops being bumped and gets archived
+    "bumpLimit": 300,
+    // How long archived threads are kept before permanent deletion, in seconds (172800 = 48h)
+    "archivePurgeSeconds": 172800,
+    // Reason strings attached to automated moderation actions (visible in logs)
+    "moderationReasons": {
+      // Reason shown when a thread is archived because it fell past the last page
+      "archiveCapacity": "5chan board manager: thread archived — exceeded board capacity",
+      // Reason shown when a thread hits the bump limit
+      "archiveBumpLimit": "5chan board manager: thread archived — reached bump limit",
+      // Reason shown when an archived thread is permanently purged after retention expires
+      "purgeArchived": "5chan board manager: thread purged — archive retention expired",
+      // Reason shown when author-deleted content is purged
+      "purgeDeleted": "5chan board manager: content purged — author-deleted"
+    }
+  },
+
   // Community settings — applied directly to the subplebbit (plebbit community)
   "boardSettings": {
     // Feature flags that control how users interact with the board
@@ -88,29 +111,6 @@
           ]
         }
       ]
-    }
-  },
-
-  // Board manager settings — controls pagination, thread lifecycle, and auto-moderation
-  "boardManagerSettings": {
-    // Number of threads shown per page
-    "perPage": 15,
-    // Number of pages on the board. Total thread capacity = perPage x pages
-    "pages": 10,
-    // Max replies before a thread stops being bumped and gets archived
-    "bumpLimit": 300,
-    // How long archived threads are kept before permanent deletion, in seconds (172800 = 48h)
-    "archivePurgeSeconds": 172800,
-    // Reason strings attached to automated moderation actions (visible in logs)
-    "moderationReasons": {
-      // Reason shown when a thread is archived because it fell past the last page
-      "archiveCapacity": "5chan board manager: thread archived — exceeded board capacity",
-      // Reason shown when a thread hits the bump limit
-      "archiveBumpLimit": "5chan board manager: thread archived — reached bump limit",
-      // Reason shown when an archived thread is permanently purged after retention expires
-      "purgeArchived": "5chan board manager: thread purged — archive retention expired",
-      // Reason shown when author-deleted content is purged
-      "purgeDeleted": "5chan board manager: content purged — author-deleted"
     }
   }
 }

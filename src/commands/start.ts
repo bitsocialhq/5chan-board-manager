@@ -3,7 +3,16 @@ import { loadConfig } from '../config-manager.js'
 import { startBoardManagers } from '../board-managers.js'
 
 export default class Start extends Command {
-  static override description = 'Start board managers, watching the config directory for changes'
+  static override description = `Start board managers for all configured boards
+
+Board managers enforce imageboard-style thread lifecycle rules on each board:
+- Archive threads that exceed board capacity (perPage × pages)
+- Archive threads that reach the bump limit
+- Purge archived threads after the retention period expires
+- Purge author-deleted threads and replies
+
+The config directory is watched for changes; boards are hot-reloaded
+(added, removed, or restarted) without requiring a full restart.`
 
   static override examples = [
     '5chan start',

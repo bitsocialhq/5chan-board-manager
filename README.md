@@ -103,6 +103,8 @@ docker compose exec 5chan 5chan board add <community-address> --apply-defaults
 
 # Verify it was added
 docker compose exec 5chan 5chan board list
+
+# You can load the board now by its address in 5chan or any other web ui
 ```
 
 #### Standalone (bitsocial-cli already running)

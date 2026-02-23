@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.3](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.2...v0.1.3) (2026-02-23)
+
+### Bug Fixes
+
+* **ci:** add packages:read permission for GHCR pulls ([a5fa4a6](https://github.com/bitsocialhq/5chan-board-manager/commit/a5fa4a607a8243e8f7a9a4e4c6834b536c900651))
+
 ## [0.1.2](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.1...v0.1.2) (2026-02-23)
 
 ### Bug Fixes

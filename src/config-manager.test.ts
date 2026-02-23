@@ -27,11 +27,11 @@ function writeBoardConfig(dir: string, board: unknown): void {
 
 describe('path helpers', () => {
   it('globalConfigPath returns global.json path', () => {
-    expect(globalConfigPath('/foo/bar')).toBe('/foo/bar/global.json')
+    expect(globalConfigPath('/foo/bar')).toBe(join('/foo/bar', 'global.json'))
   })
 
   it('boardConfigPath returns boards/{address}.json path', () => {
-    expect(boardConfigPath('/foo/bar', 'test.bso')).toBe('/foo/bar/boards/test.bso.json')
+    expect(boardConfigPath('/foo/bar', 'test.bso')).toBe(join('/foo/bar', 'boards', 'test.bso.json'))
   })
 })
 

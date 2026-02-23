@@ -250,7 +250,7 @@ describe('openPresetInEditor', () => {
     ).rejects.toThrow('Failed to launch editor')
   })
 
-  it('injects --syntax=json when editor is nano', async () => {
+  it.skipIf(process.platform === 'win32')('injects --syntax=json when editor is nano', async () => {
     const { mkdtempSync, writeFileSync, chmodSync } = await import('node:fs')
     const { join } = await import('node:path')
     const { tmpdir } = await import('node:os')

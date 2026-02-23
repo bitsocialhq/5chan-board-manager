@@ -257,7 +257,7 @@ EXAMPLES
   $ 5chan board add my-board.bso --apply-defaults --defaults-preset ./my-preset.json
 ```
 
-_See code: [src/commands/board/add.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.0/src/commands/board/add.ts)_
+_See code: [src/commands/board/add.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.1/src/commands/board/add.ts)_
 
 ## `5chan board edit ADDRESS`
 
@@ -265,20 +265,20 @@ Edit 5chan settings for an existing board
 
 ```
 USAGE
-  $ 5chan board edit ADDRESS [--per-page <value>] [--pages <value>] [--bump-limit <value>]
-    [--archive-purge-seconds <value>] [--reset <value>] [-i]
+  $ 5chan board edit ADDRESS [-i | --per-page <value> | --pages <value> | --bump-limit <value> |
+    --archive-purge-seconds <value> | --reset <value>]
 
 ARGUMENTS
   ADDRESS  Board address to edit
 
 FLAGS
-  -i, --interactive                Open the board config in $EDITOR for interactive editing
-  --archive-purge-seconds=<value>  Seconds after archiving before purge
-  --bump-limit=<value>             Bump limit for threads
-  --pages=<value>                  Number of pages
-  --per-page=<value>               Posts per page
-  --reset=<value>                  Comma-separated fields to reset to defaults (per-page, pages, bump-limit,
-                                   archive-purge-seconds, moderation-reasons)
+  -i, --interactive                    Open the board config in $EDITOR for interactive editing
+      --archive-purge-seconds=<value>  Seconds after archiving before purge
+      --bump-limit=<value>             Bump limit for threads
+      --pages=<value>                  Number of pages
+      --per-page=<value>               Posts per page
+      --reset=<value>                  Comma-separated fields to reset to defaults (per-page, pages, bump-limit,
+                                       archive-purge-seconds, moderation-reasons)
 
 DESCRIPTION
   Edit 5chan settings for an existing board
@@ -304,7 +304,7 @@ EXAMPLES
   $ 5chan board edit random.bso -i
 ```
 
-_See code: [src/commands/board/edit.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.0/src/commands/board/edit.ts)_
+_See code: [src/commands/board/edit.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.1/src/commands/board/edit.ts)_
 
 ## `5chan board list`
 
@@ -317,13 +317,11 @@ USAGE
 DESCRIPTION
   List all board addresses
 
-  Outputs one address per line, suitable for piping to other commands.
-
 EXAMPLES
   $ 5chan board list
 ```
 
-_See code: [src/commands/board/list.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.0/src/commands/board/list.ts)_
+_See code: [src/commands/board/list.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.1/src/commands/board/list.ts)_
 
 ## `5chan board remove ADDRESS`
 
@@ -343,7 +341,7 @@ EXAMPLES
   $ 5chan board remove random.bso
 ```
 
-_See code: [src/commands/board/remove.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.0/src/commands/board/remove.ts)_
+_See code: [src/commands/board/remove.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.1/src/commands/board/remove.ts)_
 
 ## `5chan help [COMMAND]`
 
@@ -367,7 +365,7 @@ _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v6.2.3
 
 ## `5chan start`
 
-Start board managers, watching the config directory for changes
+Start board managers for all configured boards
 
 ```
 USAGE
@@ -377,7 +375,16 @@ FLAGS
   -c, --config-dir=<value>  Path to config directory (overrides default)
 
 DESCRIPTION
-  Start board managers, watching the config directory for changes
+  Start board managers for all configured boards
+
+  Board managers enforce imageboard-style thread lifecycle rules on each board:
+  - Archive threads that exceed board capacity (perPage × pages)
+  - Archive threads that reach the bump limit
+  - Purge archived threads after the retention period expires
+  - Purge author-deleted threads and replies
+
+  The config directory is watched for changes; boards are hot-reloaded
+  (added, removed, or restarted) without requiring a full restart.
 
 EXAMPLES
   $ 5chan start
@@ -385,7 +392,7 @@ EXAMPLES
   $ 5chan start --config-dir /path/to/config
 ```
 
-_See code: [src/commands/start.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.0/src/commands/start.ts)_
+_See code: [src/commands/start.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.1/src/commands/start.ts)_
 <!-- commandsstop -->
 
 ## Config Hot-Reload

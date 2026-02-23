@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.4](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.3...v0.1.4) (2026-02-23)
+
+### Bug Fixes
+
+* **ci:** use quiet flag when extracting community address ([c409dfb](https://github.com/bitsocialhq/5chan-board-manager/commit/c409dfb63394fecc6fc10c5f2dc58a2d9cfbcac9))
+
 ## [0.1.3](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.2...v0.1.3) (2026-02-23)
 
 ### Bug Fixes

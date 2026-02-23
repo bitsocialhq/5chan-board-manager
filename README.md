@@ -257,7 +257,7 @@ EXAMPLES
   $ 5chan board add my-board.bso --apply-defaults --defaults-preset ./my-preset.json
 ```
 
-_See code: [src/commands/board/add.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.1/src/commands/board/add.ts)_
+_See code: [src/commands/board/add.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.2/src/commands/board/add.ts)_
 
 ## `5chan board edit ADDRESS`
 
@@ -304,7 +304,7 @@ EXAMPLES
   $ 5chan board edit random.bso -i
 ```
 
-_See code: [src/commands/board/edit.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.1/src/commands/board/edit.ts)_
+_See code: [src/commands/board/edit.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.2/src/commands/board/edit.ts)_
 
 ## `5chan board list`
 
@@ -321,7 +321,7 @@ EXAMPLES
   $ 5chan board list
 ```
 
-_See code: [src/commands/board/list.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.1/src/commands/board/list.ts)_
+_See code: [src/commands/board/list.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.2/src/commands/board/list.ts)_
 
 ## `5chan board remove ADDRESS`
 
@@ -341,7 +341,7 @@ EXAMPLES
   $ 5chan board remove random.bso
 ```
 
-_See code: [src/commands/board/remove.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.1/src/commands/board/remove.ts)_
+_See code: [src/commands/board/remove.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.2/src/commands/board/remove.ts)_
 
 ## `5chan help [COMMAND]`
 
@@ -392,7 +392,7 @@ EXAMPLES
   $ 5chan start --config-dir /path/to/config
 ```
 
-_See code: [src/commands/start.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.1/src/commands/start.ts)_
+_See code: [src/commands/start.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.1.2/src/commands/start.ts)_
 <!-- commandsstop -->
 
 ## Config Hot-Reload

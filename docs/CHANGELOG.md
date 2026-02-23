@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.1...v0.1.2) (2026-02-23)
+
+### Bug Fixes
+
+* **ci:** add GHCR authentication to Docker Compose CI workflow ([610e237](https://github.com/bitsocialhq/5chan-board-manager/commit/610e23770d6a544f3a3d2e3dca553c7cbd6565b9))
+* **ci:** trigger CI workflow on any .github/ changes ([e099498](https://github.com/bitsocialhq/5chan-board-manager/commit/e099498c25cf04cdddfb6ced4144fe06fea01763))
+
 ## 0.1.1 (2026-02-23)
 
 ### Features

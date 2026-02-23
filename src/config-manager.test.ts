@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import {
   loadConfig, loadGlobalConfig, loadBoardConfig, saveGlobalConfig,
   saveBoardConfig, deleteBoardConfig, updateBoardConfig, diffBoards,
-  globalConfigPath, boardConfigPath,
+  globalConfigPath, boardConfigPath, renameBoardConfig,
 } from './config-manager.js'
 import type { BoardConfig, GlobalConfig, MultiBoardConfig } from './types.js'
 
@@ -522,5 +522,61 @@ describe('diffBoards', () => {
     }
     const diff = diffBoards(config, { ...config, boards: [{ address: 'a.bso', moderationReasons: { ...reasons } }] })
     expect(diff.changed).toHaveLength(0)
+  })
+})
+
+describe('renameBoardConfig', () => {
+  const dirs: string[] = []
+
+  function tmpDir(): string {
+    const d = makeTmpDir()
+    dirs.push(d)
+    return d
+  }
+
+  afterEach(() => {
+    for (const d of dirs) {
+      rmSync(d, { recursive: true, force: true })
+    }
+    dirs.length = 0
+  })
+
+  it('renames config file and updates address field', () => {
+    const dir = tmpDir()
+    saveBoardConfig(dir, { address: 'old.bso', bumpLimit: 500, perPage: 20 })
+    expect(existsSync(boardConfigPath(dir, 'old.bso'))).toBe(true)
+
+    renameBoardConfig(dir, 'old.bso', 'new.bso')
+
+    expect(existsSync(boardConfigPath(dir, 'old.bso'))).toBe(false)
+    expect(existsSync(boardConfigPath(dir, 'new.bso'))).toBe(true)
+
+    const newConfig = loadBoardConfig(boardConfigPath(dir, 'new.bso'))
+    expect(newConfig.address).toBe('new.bso')
+    expect(newConfig.bumpLimit).toBe(500)
+    expect(newConfig.perPage).toBe(20)
+  })
+
+  it('throws on conflict when new address already exists', () => {
+    const dir = tmpDir()
+    saveBoardConfig(dir, { address: 'old.bso' })
+    saveBoardConfig(dir, { address: 'existing.bso' })
+
+    expect(() => renameBoardConfig(dir, 'old.bso', 'existing.bso')).toThrow(
+      'Board config for "existing.bso" already exists, cannot rename from "old.bso"'
+    )
+
+    // Old config should still exist
+    expect(existsSync(boardConfigPath(dir, 'old.bso'))).toBe(true)
+  })
+
+  it('preserves moderationReasons through rename', () => {
+    const dir = tmpDir()
+    saveBoardConfig(dir, { address: 'a.bso', moderationReasons: { archiveCapacity: 'custom reason' } })
+
+    renameBoardConfig(dir, 'a.bso', 'b.bso')
+
+    const config = loadBoardConfig(boardConfigPath(dir, 'b.bso'))
+    expect(config.moderationReasons?.archiveCapacity).toBe('custom reason')
   })
 })

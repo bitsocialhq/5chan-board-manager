@@ -17,6 +17,20 @@ export async function startMultiBoardManager(config: MultiBoardConfig): Promise<
   const errors = new Map<string, Error>()
   let stopping = false
 
+  function onAddressChange(oldAddress: string, newAddress: string): void {
+    const manager = boardManagers.get(oldAddress)
+    if (manager) {
+      boardManagers.delete(oldAddress)
+      boardManagers.set(newAddress, manager)
+    }
+    const error = errors.get(oldAddress)
+    if (error) {
+      errors.delete(oldAddress)
+      errors.set(newAddress, error)
+    }
+    log(`board address changed: ${oldAddress} → ${newAddress}`)
+  }
+
   for (const board of config.boards) {
     if (stopping) {
       log(`skipping ${board.address} — shutdown requested`)
@@ -26,7 +40,7 @@ export async function startMultiBoardManager(config: MultiBoardConfig): Promise<
     const options = resolveBoardManagerOptions(board, config)
     try {
       log(`starting board manager for ${board.address}`)
-      const result = await startBoardManager(options)
+      const result = await startBoardManager({ ...options, onAddressChange })
       boardManagers.set(board.address, result)
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err))

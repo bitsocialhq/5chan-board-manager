@@ -1,6 +1,7 @@
 import { connectToPlebbitRpc } from './plebbit-rpc.js'
 import Logger from '@plebbit/plebbit-logger'
 import { join } from 'node:path'
+import { unlinkSync } from 'node:fs'
 import { loadState, saveState, defaultStateDir, acquireLock } from './state.js'
 import type { BoardManagerOptions, BoardManagerResult, BoardManagerState, Comment, FileLock, ModerationReasons, Subplebbit, Signer, ThreadComment, Page } from './types.js'
 
@@ -21,13 +22,14 @@ const DEFAULTS = {
 
 export async function startBoardManager(options: BoardManagerOptions): Promise<BoardManagerResult> {
   const {
-    subplebbitAddress,
     plebbitRpcUrl,
     perPage = DEFAULTS.perPage,
     pages = DEFAULTS.pages,
     bumpLimit = DEFAULTS.bumpLimit,
     archivePurgeSeconds = DEFAULTS.archivePurgeSeconds,
   } = options
+
+  let subplebbitAddress = options.subplebbitAddress
 
   const moderationReasons: Required<ModerationReasons> = {
     archiveCapacity: options.moderationReasons?.archiveCapacity ?? DEFAULTS.moderationReasons.archiveCapacity,
@@ -38,7 +40,7 @@ export async function startBoardManager(options: BoardManagerOptions): Promise<B
 
   const maxThreads = perPage * pages
   const stateDir = options.stateDir ?? defaultStateDir()
-  const statePath = join(stateDir, `${subplebbitAddress}.json`)
+  let statePath = join(stateDir, `${subplebbitAddress}.json`)
 
   let fileLock: FileLock
   try {
@@ -83,6 +85,53 @@ export async function startBoardManager(options: BoardManagerOptions): Promise<B
     state.signers[subplebbitAddress] = { privateKey: signer.privateKey }
     saveState(statePath, state)
     return signer
+  }
+
+  function migrateAddress(newAddress: string): void {
+    const oldAddress = subplebbitAddress
+    const oldStatePath = statePath
+    const newStatePath = join(stateDir, `${newAddress}.json`)
+
+    log(`address changed: ${oldAddress} → ${newAddress}, migrating state`)
+
+    // Migrate signer key
+    if (state.signers[oldAddress]) {
+      state.signers[newAddress] = state.signers[oldAddress]
+      delete state.signers[oldAddress]
+    }
+
+    // Release old lock
+    fileLock.release()
+
+    // Save state to new path
+    saveState(newStatePath, state)
+
+    // Acquire lock on new path
+    try {
+      fileLock = acquireLock(newStatePath)
+    } catch (err) {
+      // Rollback: re-acquire old lock, restore signer key
+      log.error(`failed to acquire lock on new state path ${newStatePath}: ${err}`)
+      if (state.signers[newAddress]) {
+        state.signers[oldAddress] = state.signers[newAddress]
+        delete state.signers[newAddress]
+      }
+      fileLock = acquireLock(oldStatePath)
+      saveState(oldStatePath, state)
+      throw err
+    }
+
+    // Delete old state file (best-effort)
+    try { unlinkSync(oldStatePath) } catch {}
+
+    // Update mutable references
+    subplebbitAddress = newAddress
+    statePath = newStatePath
+
+    // Notify caller
+    options.onAddressChange?.(oldAddress, newAddress)
+
+    log(`address migration complete: ${oldAddress} → ${newAddress}`)
   }
 
   async function archiveThread(commentCid: string, signer: Signer, reason: string): Promise<void> {
@@ -319,6 +368,14 @@ export async function startBoardManager(options: BoardManagerOptions): Promise<B
 
     const run = async (): Promise<void> => {
       try {
+        // Detect address change (e.g., hash → named address via bitsocial-cli)
+        if (subplebbit.address && subplebbit.address !== subplebbitAddress) {
+          try {
+            migrateAddress(subplebbit.address)
+          } catch (err) {
+            log.error(`address migration failed: ${err}`)
+          }
+        }
         const signer = await getOrCreateSigner()
         await handleUpdate(subplebbit, signer)
       } catch (err) {

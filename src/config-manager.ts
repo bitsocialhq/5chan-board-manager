@@ -168,6 +168,34 @@ export function saveBoardConfig(configDir: string, board: BoardConfig): void {
 }
 
 /**
+ * Rename a board config file when the board's address changes.
+ * Loads the old config, writes a new file with the updated address, and deletes the old file.
+ * Throws if the new address already has a config file.
+ */
+export function renameBoardConfig(configDir: string, oldAddress: string, newAddress: string): void {
+  const oldPath = boardConfigPath(configDir, oldAddress)
+  const newPath = boardConfigPath(configDir, newAddress)
+
+  // Check for conflict
+  try {
+    readFileSync(newPath)
+    throw new Error(`Board config for "${newAddress}" already exists, cannot rename from "${oldAddress}"`)
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
+  }
+
+  // Load old config
+  const oldConfig = loadBoardConfig(oldPath)
+
+  // Write new config with updated address
+  const newConfig: BoardConfig = { ...oldConfig, address: newAddress }
+  saveBoardConfig(configDir, newConfig)
+
+  // Delete old config file
+  unlinkSync(oldPath)
+}
+
+/**
  * Delete a board config file. Throws if file not found.
  */
 export function deleteBoardConfig(configDir: string, address: string): void {

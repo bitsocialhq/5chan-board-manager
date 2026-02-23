@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync, unlinkSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, mkdirSync, unlinkSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { startBoardManagers } from './board-managers.js'
@@ -314,6 +314,93 @@ describe('startBoardManagers', () => {
 
       expect(stopA).toHaveBeenCalledOnce()
       expect(stopB).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe('address change', () => {
+    it('updates map keys when onAddressChange is called', async () => {
+      const stopA = makeStopFn()
+      mockStartBoardManager.mockResolvedValueOnce({ stop: stopA })
+
+      const dir = tmpDir()
+      writeBoardConfig(dir, { address: 'old.bso' })
+      const config: MultiBoardConfig = {
+        boards: [{ address: 'old.bso' }],
+      }
+
+      const manager = await startBoardManagers(dir, config)
+      expect(manager.boardManagers.has('old.bso')).toBe(true)
+
+      // Extract the onAddressChange callback from the startBoardManager call
+      const opts = mockStartBoardManager.mock.calls[0][0] as BoardManagerOptions
+      expect(opts.onAddressChange).toBeDefined()
+
+      // Simulate address change callback
+      opts.onAddressChange!('old.bso', 'new.bso')
+
+      // Map key should be updated
+      expect(manager.boardManagers.has('old.bso')).toBe(false)
+      expect(manager.boardManagers.has('new.bso')).toBe(true)
+
+      await manager.stop()
+    })
+
+    it('renames config file on disk when onAddressChange is called', async () => {
+      const stopA = makeStopFn()
+      mockStartBoardManager.mockResolvedValueOnce({ stop: stopA })
+
+      const dir = tmpDir()
+      writeBoardConfig(dir, { address: 'hash123', bumpLimit: 500 })
+      const config: MultiBoardConfig = {
+        boards: [{ address: 'hash123', bumpLimit: 500 }],
+      }
+
+      const manager = await startBoardManagers(dir, config)
+
+      // Extract and call onAddressChange
+      const opts = mockStartBoardManager.mock.calls[0][0] as BoardManagerOptions
+      opts.onAddressChange!('hash123', 'named.bso')
+
+      // Old config should be gone, new one should exist with updated address
+      expect(existsSync(join(dir, 'boards', 'hash123.json'))).toBe(false)
+      expect(existsSync(join(dir, 'boards', 'named.bso.json'))).toBe(true)
+
+      const newConfig = JSON.parse(readFileSync(join(dir, 'boards', 'named.bso.json'), 'utf-8'))
+      expect(newConfig.address).toBe('named.bso')
+      expect(newConfig.bumpLimit).toBe(500)
+
+      await manager.stop()
+    })
+
+    it('hot-reload does not cause spurious restart after rename', async () => {
+      const stopA = makeStopFn()
+      mockStartBoardManager.mockResolvedValueOnce({ stop: stopA })
+
+      const dir = tmpDir()
+      writeBoardConfig(dir, { address: 'hash456' })
+      const config: MultiBoardConfig = {
+        boards: [{ address: 'hash456' }],
+      }
+
+      const manager = await startBoardManagers(dir, config)
+
+      // Extract and call onAddressChange — this updates currentConfig in-place
+      // AND renames the config file, which triggers the fs watcher
+      const opts = mockStartBoardManager.mock.calls[0][0] as BoardManagerOptions
+      opts.onAddressChange!('hash456', 'renamed.bso')
+
+      // Wait for the watcher debounce to fire (200ms) + processing time
+      await new Promise((r) => setTimeout(r, 500))
+
+      // startBoardManager should only have been called once (initial start)
+      // — NOT a second time from the hot-reload detecting a "change"
+      expect(mockStartBoardManager).toHaveBeenCalledTimes(1)
+
+      // The manager should still be running under the new key
+      expect(manager.boardManagers.has('renamed.bso')).toBe(true)
+      expect(stopA).not.toHaveBeenCalled()
+
+      await manager.stop()
     })
   })
 })

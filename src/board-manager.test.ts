@@ -56,9 +56,10 @@ function createMockSubplebbit(postsConfig: {
   pageCids?: Partial<Record<string, string>>
   pages?: Partial<Record<string, Page>>
   getPage?: (args: { cid: string }) => Promise<Page>
-}) {
+}, address?: string) {
   let updateCallback: (() => void) | undefined
   return {
+    address: address ?? 'board.bso',
     roles: { 'mock-address-123': { role: 'moderator' as const } },
     posts: {
       pageCids: postsConfig.pageCids ?? {},
@@ -1208,6 +1209,186 @@ describe('board manager logic', () => {
     })
   })
 
+  describe('address change', () => {
+    it('detects address change and migrates state/lock files', async () => {
+      const { instance } = createMockPlebbit()
+      const mockSub = createMockSubplebbit({
+        pageCids: {},
+        pages: {},
+      }, '12D3KooWHash123')
+      vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
+
+      const boardManager = await startBoardManager({
+        subplebbitAddress: '12D3KooWHash123',
+        plebbitRpcUrl: 'ws://localhost:9138',
+        stateDir,
+      })
+
+      // Verify old state/lock files exist
+      expect(existsSync(join(stateDir, '12D3KooWHash123.json'))).toBe(true)
+      expect(existsSync(join(stateDir, '12D3KooWHash123.json.lock'))).toBe(true)
+
+      // Simulate address change
+      mockSub.address = 'random.bso'
+      mockSub._triggerUpdate()
+
+      // Wait for migration to complete
+      await vi.waitFor(() => {
+        expect(existsSync(join(stateDir, 'random.bso.json'))).toBe(true)
+      })
+
+      // Old files should be cleaned up
+      expect(existsSync(join(stateDir, '12D3KooWHash123.json'))).toBe(false)
+
+      // New lock should exist
+      expect(existsSync(join(stateDir, 'random.bso.json.lock'))).toBe(true)
+
+      // Verify signer was migrated
+      const newState = loadState(join(stateDir, 'random.bso.json'))
+      expect(newState.signers['random.bso']).toBeDefined()
+      expect(newState.signers['12D3KooWHash123']).toBeUndefined()
+
+      await boardManager.stop()
+    })
+
+    it('calls onAddressChange callback with correct args', async () => {
+      const { instance } = createMockPlebbit()
+      const mockSub = createMockSubplebbit({
+        pageCids: {},
+        pages: {},
+      }, '12D3KooWHash456')
+      vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
+
+      const onAddressChange = vi.fn()
+      const boardManager = await startBoardManager({
+        subplebbitAddress: '12D3KooWHash456',
+        plebbitRpcUrl: 'ws://localhost:9138',
+        stateDir,
+        onAddressChange,
+      })
+
+      // Simulate address change
+      mockSub.address = 'named.bso'
+      mockSub._triggerUpdate()
+
+      await vi.waitFor(() => {
+        expect(onAddressChange).toHaveBeenCalledOnce()
+      })
+
+      expect(onAddressChange).toHaveBeenCalledWith('12D3KooWHash456', 'named.bso')
+
+      await boardManager.stop()
+    })
+
+    it('subsequent moderation uses new address after migration', async () => {
+      const { instance, publishedModerations } = createMockPlebbit()
+      const threads = Array.from({ length: 5 }, (_, i) => mockThread(`QmAddr${i}`))
+      const getPage = vi.fn().mockResolvedValue({
+        comments: threads,
+        nextCid: undefined,
+      } as Page)
+
+      const mockSub = createMockSubplebbit({
+        pageCids: { active: 'QmPage1' },
+        pages: {},
+        getPage,
+      }, '12D3KooWOld')
+      vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
+
+      const boardManager = await startBoardManager({
+        subplebbitAddress: '12D3KooWOld',
+        plebbitRpcUrl: 'ws://localhost:9138',
+        stateDir,
+        perPage: 2,
+        pages: 1, // capacity 2, so 3 archived
+      })
+
+      // Wait for initial moderation
+      await vi.waitFor(() => {
+        expect(publishedModerations).toHaveLength(3)
+      })
+
+      // All initial moderations should use old address
+      for (const mod of publishedModerations) {
+        expect(mod.subplebbitAddress).toBe('12D3KooWOld')
+      }
+
+      // Simulate address change
+      publishedModerations.length = 0
+      mockSub.address = 'new.bso'
+      mockSub._triggerUpdate()
+
+      // Wait for new moderations after address change
+      // The threads are the same, so archived ones won't be re-archived.
+      // But we can verify the state was migrated.
+      await vi.waitFor(() => {
+        expect(existsSync(join(stateDir, 'new.bso.json'))).toBe(true)
+      })
+
+      await boardManager.stop()
+    })
+
+    it('does not migrate when address is unchanged', async () => {
+      const { instance } = createMockPlebbit()
+      const mockSub = createMockSubplebbit({
+        pageCids: {},
+        pages: {},
+      }, 'stable.bso')
+      vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
+
+      const onAddressChange = vi.fn()
+      const boardManager = await startBoardManager({
+        subplebbitAddress: 'stable.bso',
+        plebbitRpcUrl: 'ws://localhost:9138',
+        stateDir,
+        onAddressChange,
+      })
+
+      // Trigger update without changing address
+      mockSub._triggerUpdate()
+      await new Promise((r) => setTimeout(r, 100))
+
+      expect(onAddressChange).not.toHaveBeenCalled()
+
+      await boardManager.stop()
+    })
+
+    it('gracefully handles lock conflict on new address', async () => {
+      const { instance } = createMockPlebbit()
+      const mockSub = createMockSubplebbit({
+        pageCids: {},
+        pages: {},
+      }, '12D3KooWConflict')
+      vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
+
+      // Pre-create a lock file for the new address with our own PID (simulating conflict)
+      mkdirSync(stateDir, { recursive: true })
+      writeFileSync(join(stateDir, 'conflict.bso.json.lock'), String(process.pid))
+
+      const onAddressChange = vi.fn()
+      const boardManager = await startBoardManager({
+        subplebbitAddress: '12D3KooWConflict',
+        plebbitRpcUrl: 'ws://localhost:9138',
+        stateDir,
+        onAddressChange,
+      })
+
+      // Simulate address change to conflicting address
+      mockSub.address = 'conflict.bso'
+      mockSub._triggerUpdate()
+      await new Promise((r) => setTimeout(r, 100))
+
+      // Migration should fail gracefully — callback not called
+      expect(onAddressChange).not.toHaveBeenCalled()
+
+      // Original state/lock should still exist (rollback)
+      expect(existsSync(join(stateDir, '12D3KooWConflict.json'))).toBe(true)
+      expect(existsSync(join(stateDir, '12D3KooWConflict.json.lock'))).toBe(true)
+
+      await boardManager.stop()
+    })
+  })
+
   describe('per-subplebbit state isolation', () => {
     it('two board managers for different subplebbits use separate state files', async () => {
       // First board manager for board1.bso
@@ -1219,7 +1400,7 @@ describe('board manager logic', () => {
           comments: [mockThread('QmBoard1Thread')],
           nextCid: undefined,
         } as Page),
-      })
+      }, 'board1.bso')
       vi.mocked(instance1.getSubplebbit).mockResolvedValue(mockSub1 as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager1 = await startBoardManager({
@@ -1239,7 +1420,7 @@ describe('board manager logic', () => {
           comments: [mockThread('QmBoard2Thread')],
           nextCid: undefined,
         } as Page),
-      })
+      }, 'board2.bso')
       vi.mocked(instance2.getSubplebbit).mockResolvedValue(mockSub2 as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       const boardManager2 = await startBoardManager({

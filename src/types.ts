@@ -34,6 +34,7 @@ export interface BoardManagerOptions {
   bumpLimit?: number
   archivePurgeSeconds?: number
   moderationReasons?: ModerationReasons
+  onAddressChange?: (oldAddress: string, newAddress: string) => void
 }
 
 export interface BoardManagerResult {

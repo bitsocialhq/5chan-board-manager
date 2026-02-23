@@ -2,7 +2,7 @@ import { watch, type FSWatcher } from 'node:fs'
 import { join } from 'node:path'
 import Logger from '@plebbit/plebbit-logger'
 import { startBoardManager } from './board-manager.js'
-import { loadConfig, globalConfigPath } from './config-manager.js'
+import { loadConfig, globalConfigPath, renameBoardConfig } from './config-manager.js'
 import { resolveBoardManagerOptions } from './multi-config.js'
 import type { BoardManagerResult, MultiBoardConfig } from './types.js'
 
@@ -30,12 +30,44 @@ export async function startBoardManagers(
   let reloading = false
   let stopped = false
 
+  function onAddressChange(oldAddress: string, newAddress: string): void {
+    // Update boardManagers map key
+    const manager = boardManagers.get(oldAddress)
+    if (manager) {
+      boardManagers.delete(oldAddress)
+      boardManagers.set(newAddress, manager)
+    }
+
+    // Update errors map key
+    const error = errors.get(oldAddress)
+    if (error) {
+      errors.delete(oldAddress)
+      errors.set(newAddress, error)
+    }
+
+    // Update currentConfig.boards in-place so the next hot-reload diff
+    // sees the new address and does not trigger a spurious remove+add
+    const boardEntry = currentConfig.boards.find((b) => b.address === oldAddress)
+    if (boardEntry) {
+      boardEntry.address = newAddress
+    }
+
+    // Rename config file on disk
+    try {
+      renameBoardConfig(configDir, oldAddress, newAddress)
+    } catch (err) {
+      log.error(`failed to rename board config from ${oldAddress} to ${newAddress}: ${err}`)
+    }
+
+    log(`board address changed: ${oldAddress} → ${newAddress}`)
+  }
+
   // Start initial board managers sequentially
   for (const board of initialConfig.boards) {
     const options = resolveBoardManagerOptions(board, initialConfig)
     try {
       log(`starting board manager for ${board.address}`)
-      const result = await startBoardManager(options)
+      const result = await startBoardManager({ ...options, onAddressChange })
       boardManagers.set(board.address, result)
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err))
@@ -103,7 +135,7 @@ export async function startBoardManagers(
         const options = resolveBoardManagerOptions(board, newConfig)
         try {
           log(`starting board manager for changed board ${board.address}`)
-          const result = await startBoardManager(options)
+          const result = await startBoardManager({ ...options, onAddressChange })
           boardManagers.set(board.address, result)
         } catch (err) {
           const error = err instanceof Error ? err : new Error(String(err))
@@ -117,7 +149,7 @@ export async function startBoardManagers(
         const options = resolveBoardManagerOptions(board, newConfig)
         try {
           log(`starting board manager for added board ${board.address}`)
-          const result = await startBoardManager(options)
+          const result = await startBoardManager({ ...options, onAddressChange })
           boardManagers.set(board.address, result)
           errors.delete(board.address)
         } catch (err) {

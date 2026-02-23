@@ -427,6 +427,18 @@ On startup for each board (using the internally-created Plebbit instance):
 
 Logged via `plebbit-logger` when creating signer or adding mod role.
 
+## Address Change Handling
+
+When bitsocial-cli changes a board's address (e.g., from a hash like `12D3KooW...` to a named address like `random.bso`), the board manager detects the change automatically via the plebbit-js `update` event and migrates all associated files:
+
+1. Signer key is moved to the new address in the state file
+2. State file is renamed from `{oldAddress}.json` to `{newAddress}.json`
+3. Lock file is re-acquired for the new address
+4. Config file is renamed from `boards/{oldAddress}.json` to `boards/{newAddress}.json` (with updated `address` field)
+5. Internal maps are updated so moderation continues uninterrupted
+
+The mod signer carries over to the new address — no need to re-assign the moderator role. If the migration fails (e.g., lock conflict on the new address), the board manager logs the error and continues operating under the old address.
+
 ## State Persistence
 
 State is stored as one JSON file per board in the state directory (via `env-paths`: `~/.local/share/5chan-board-manager/5chan_board_manager_states/{address}.json`) or a custom directory via `stateDir` in the config.

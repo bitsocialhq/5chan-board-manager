@@ -85,7 +85,7 @@ jobs:
       - name: Extract community address
         id: community
         run: |
-          ADDRESS=$(docker compose exec -T bitsocial bitsocial community list | head -n1 | tr -d '[:space:]')
+          ADDRESS=$(docker compose exec -T bitsocial bitsocial community list -q | head -n1 | tr -d '[:space:]')
           echo "address=$ADDRESS" >> "$GITHUB_OUTPUT"
           echo "Community address: $ADDRESS"
 
@@ -212,7 +212,7 @@ jobs:
       - name: Extract community address
         id: community
         run: |
-          ADDRESS=$(docker exec bitsocial bitsocial community list | head -n1 | tr -d '[:space:]')
+          ADDRESS=$(docker exec bitsocial bitsocial community list -q | head -n1 | tr -d '[:space:]')
           echo "address=$ADDRESS" >> "$GITHUB_OUTPUT"
           echo "Community address: $ADDRESS"
 

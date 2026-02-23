@@ -46,7 +46,7 @@
   "dependencies": {
     "@oclif/core": "4.8.0",
     "@oclif/plugin-help": "6.2.37",
-    "@plebbit/plebbit-js": "git+https://github.com/plebbit/plebbit-js.git#a92fb7e82b4a534c160fc74dc1902d63e24e3142",
+    "@plebbit/plebbit-js": "git+https://github.com/plebbit/plebbit-js.git#cfb998ee6334ce479d5f30eec892a34ed155d309",
     "env-paths": "4.0.0",
     "strip-json-comments": "5.0.3",
     "zod": "4.3.6"

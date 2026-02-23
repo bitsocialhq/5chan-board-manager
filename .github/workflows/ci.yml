@@ -10,7 +10,7 @@ on:
       - 'vitest.e2e.config.ts'
       - 'src/**'
       - 'e2e/**'
-      - '.github/workflows/ci.yml'
+      - '.github/**'
   pull_request:
     paths:
       - 'package.json'
@@ -20,7 +20,7 @@ on:
       - 'vitest.e2e.config.ts'
       - 'src/**'
       - 'e2e/**'
-      - '.github/workflows/ci.yml'
+      - '.github/**'
 
 jobs:
   test:

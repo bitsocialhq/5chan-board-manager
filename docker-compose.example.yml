@@ -35,6 +35,9 @@ services:
     volumes:
       - 5chan-data:/data
     environment:
+      # The auth key path is required for remote RPC connections.
+      # Find it with: docker logs bitsocial 2>&1 | grep "secret auth key"
+      # Example: ws://bitsocial:9138/YourAuthKeyHere
       - PLEBBIT_RPC_WS_URL=ws://bitsocial:9138
 
 volumes:

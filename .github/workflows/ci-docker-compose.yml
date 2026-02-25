@@ -17,6 +17,7 @@ on:
       - "package-lock.json"
       - "tsconfig.json"
       - ".github/workflows/ci-docker-compose.yml"
+      - ".github/docker-compose.ci.yml"
 
 jobs:
   full-stack:
@@ -53,12 +54,10 @@ jobs:
 
       - name: Prepare compose files
         run: |
-          cp docker-compose.example.yml docker-compose.yml
+          cp .github/docker-compose.ci.yml docker-compose.yml
 
           cat > docker-compose.override.yml <<'EOF'
           services:
-            bitsocial:
-              sysctls: []
             5chan:
               image: 5chan-board-manager:ci-test
               command: ["sleep", "infinity"]

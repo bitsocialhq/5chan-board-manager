@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.5](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.4...v0.1.5) (2026-02-25)
+
+### Features
+
+* add configurable userAgent to Plebbit RPC connection ([15c0a7e](https://github.com/bitsocialhq/5chan-board-manager/commit/15c0a7e81d7cb3414284c66851c123828ca23e95))
+
+### Bug Fixes
+
+* **ci:** pass RPC auth key for cross-container connections ([0a53751](https://github.com/bitsocialhq/5chan-board-manager/commit/0a53751ac31ce234a5e601e32718ad6dc08619c0))
+
 ## [0.1.4](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.3...v0.1.4) (2026-02-23)
 
 ### Bug Fixes

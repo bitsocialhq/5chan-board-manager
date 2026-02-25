@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.7](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.6...v0.1.7) (2026-02-25)
+
+### Bug Fixes
+
+* **defaults:** overwrite arrays in buildMissingObjectPatch instead of skipping them ([2c93da9](https://github.com/bitsocialhq/5chan-board-manager/commit/2c93da9c995fc8456987c3ddabb56dd2b09085bd))
+
 ## [0.1.6](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.5...v0.1.6) (2026-02-25)
 
 ### Bug Fixes

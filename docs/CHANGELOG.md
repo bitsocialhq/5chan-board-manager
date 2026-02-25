@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.9](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.8...v0.1.9) (2026-02-25)
+
+### Bug Fixes
+
+* **ci:** neutralize sysctls in full-stack job for GitHub Actions ([2942abc](https://github.com/bitsocialhq/5chan-board-manager/commit/2942abcefc6421ac14c7977bd91fadebe1741987))
+
 ## [0.1.8](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.7...v0.1.8) (2026-02-25)
 
 ### Bug Fixes

@@ -212,6 +212,24 @@ describe('buildMissingObjectPatch', () => {
     })
   })
 
+  it('overwrites arrays when they differ from existing value', () => {
+    const patch = buildMissingObjectPatch(
+      { items: [1, 2, 3] },
+      { items: [4, 5, 6] },
+    )
+
+    expect(patch).toEqual({ items: [4, 5, 6] })
+  })
+
+  it('skips arrays when they are identical to existing value', () => {
+    const patch = buildMissingObjectPatch(
+      { items: [1, 2, 3] },
+      { items: [1, 2, 3] },
+    )
+
+    expect(patch).toBeUndefined()
+  })
+
   it('returns undefined when nothing is missing', () => {
     const patch = buildMissingObjectPatch(
       {
@@ -246,7 +264,7 @@ describe('buildCommunityDefaultsPatch', () => {
     expect(changedFields).toEqual(['features', 'settings'])
     expect(patch).toEqual({
       features: { noDownvotes: true },
-      settings: { fetchThumbnailUrls: false },
+      settings: { challenges: [{ name: 'captcha-v2' }], fetchThumbnailUrls: false },
     })
   })
 })

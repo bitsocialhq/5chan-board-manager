@@ -182,6 +182,13 @@ export function buildMissingObjectPatch(
       continue
     }
 
+    if (Array.isArray(defaultValue)) {
+      if (JSON.stringify(existingValue) !== JSON.stringify(defaultValue)) {
+        patch[key] = structuredClone(defaultValue)
+      }
+      continue
+    }
+
     if (existingValue === undefined) {
       patch[key] = structuredClone(defaultValue)
     }

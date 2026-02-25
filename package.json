@@ -1,6 +1,6 @@
 {
   "name": "5chan-board-manager",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "4chan-style thread auto-archiving and purging for plebbit-js subplebbits",
   "license": "GPL-3.0-only",
   "repository": {

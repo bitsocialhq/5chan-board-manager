@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.14](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.13...v0.1.14) (2026-02-25)
+
+### Bug Fixes
+
+* **ci:** warm arm64 cache in build job so publish is a cache hit ([9bdeb88](https://github.com/bitsocialhq/5chan-board-manager/commit/9bdeb882af35eb0eab083115912798c19461c7f4))
+* comment out sysctls in docker-compose.example.yml for rootless Docker compatibility ([96d98e9](https://github.com/bitsocialhq/5chan-board-manager/commit/96d98e9fd0ecb82925343eb1b7958ff73df0773b))
+* install nano in Docker image so editor works out of the box ([3019f33](https://github.com/bitsocialhq/5chan-board-manager/commit/3019f33f9384a9284def21c301096f45ae281930))
+
 ## [0.1.13](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.12...v0.1.13) (2026-02-25)
 
 ### Bug Fixes

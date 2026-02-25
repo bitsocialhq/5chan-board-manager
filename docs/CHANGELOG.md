@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.6](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.5...v0.1.6) (2026-02-25)
+
+### Bug Fixes
+
+* **docker:** include preset files in Docker image ([7c6a559](https://github.com/bitsocialhq/5chan-board-manager/commit/7c6a559188e510c826030a651cda42e839506af1))
+
 ## [0.1.5](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.4...v0.1.5) (2026-02-25)
 
 ### Features

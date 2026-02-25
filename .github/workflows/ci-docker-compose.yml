@@ -57,6 +57,8 @@ jobs:
 
           cat > docker-compose.override.yml <<'EOF'
           services:
+            bitsocial:
+              sysctls: []
             5chan:
               image: 5chan-board-manager:ci-test
               command: ["sleep", "infinity"]

@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.11](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.10...v0.1.11) (2026-02-25)
+
+### Reverts
+
+* **ci:** restore heredoc indentation — YAML block scalar strips it ([6aa1b4e](https://github.com/bitsocialhq/5chan-board-manager/commit/6aa1b4e8994c07f26f009495e60db792d86e2c85))
+
 ## [0.1.10](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.9...v0.1.10) (2026-02-25)
 
 ### Bug Fixes

@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.10](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.9...v0.1.10) (2026-02-25)
+
+### Bug Fixes
+
+* **ci:** remove heredoc indentation producing invalid YAML ([161c5b0](https://github.com/bitsocialhq/5chan-board-manager/commit/161c5b0137e0746b8f482d6e3c51c825bab78080))
+
 ## [0.1.9](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.8...v0.1.9) (2026-02-25)
 
 ### Bug Fixes

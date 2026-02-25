@@ -130,7 +130,10 @@ export function openInEditor(
 
     child.on('error', (err) => {
       cleanup(filePath)
-      reject(new Error(`Failed to launch editor "${editor}": ${err.message}`))
+      reject(new Error(
+        `Failed to launch editor "${editor}": ${err.message}\n` +
+        'Install an editor (e.g. apt-get install nano) or set $EDITOR.',
+      ))
     })
 
     child.on('close', (code) => {

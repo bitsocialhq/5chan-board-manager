@@ -211,6 +211,12 @@ describe('openInEditor', () => {
       openInEditor('{}', { editorCommand: 'nonexistent-editor-command-xyz' }),
     ).rejects.toThrow('Failed to launch editor')
   })
+
+  it('includes actionable guidance when editor is not found', async () => {
+    await expect(
+      openInEditor('{}', { editorCommand: 'nonexistent-editor-command-xyz' }),
+    ).rejects.toThrow('Install an editor (e.g. apt-get install nano) or set $EDITOR.')
+  })
 })
 
 describe('openPresetInEditor', () => {

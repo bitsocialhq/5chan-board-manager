@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.13](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.12...v0.1.13) (2026-02-25)
+
+### Bug Fixes
+
+* **ci:** build Docker image once and share across test jobs ([f293cd5](https://github.com/bitsocialhq/5chan-board-manager/commit/f293cd5acdbdce213961af006dc459f389b46158))
+* pre-configure RPC auth key in docker-compose so 5chan connects out of the box ([d78fe47](https://github.com/bitsocialhq/5chan-board-manager/commit/d78fe475e2fb9a6cf35f73d9188c7643b4b4c032))
+
 ## [0.1.12](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.11...v0.1.12) (2026-02-25)
 
 ### Bug Fixes

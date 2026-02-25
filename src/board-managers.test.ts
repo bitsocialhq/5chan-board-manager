@@ -128,6 +128,20 @@ describe('startBoardManagers', () => {
     await manager.stop()
   })
 
+  it('starts with empty config when boards directory does not exist', async () => {
+    const dir = tmpDir()
+    // Do NOT create boards/ directory — startBoardManagers should create it
+    const config: MultiBoardConfig = { boards: [] }
+
+    const manager = await startBoardManagers(dir, config)
+
+    expect(manager.boardManagers.size).toBe(0)
+    expect(manager.errors.size).toBe(0)
+    expect(existsSync(join(dir, 'boards'))).toBe(true)
+
+    await manager.stop()
+  })
+
   it('passes correct options to startBoardManager', async () => {
     mockStartBoardManager.mockResolvedValue({ stop: makeStopFn() })
 
@@ -153,6 +167,28 @@ describe('startBoardManagers', () => {
   })
 
   describe('hot-reload', () => {
+    it('picks up boards added after starting with zero boards', async () => {
+      const stopNew = makeStopFn()
+      mockStartBoardManager.mockResolvedValueOnce({ stop: stopNew })
+
+      const dir = tmpDir()
+      const config: MultiBoardConfig = { boards: [] }
+
+      const manager = await startBoardManagers(dir, config)
+      expect(manager.boardManagers.size).toBe(0)
+
+      // Add a board config file (simulating "5chan board add")
+      writeBoardConfig(dir, { address: 'new.bso' })
+
+      // Wait for debounce + async handling
+      await new Promise((r) => setTimeout(r, 500))
+
+      expect(manager.boardManagers.size).toBe(1)
+      expect(manager.boardManagers.has('new.bso')).toBe(true)
+
+      await manager.stop()
+    })
+
     it('starts new board managers when boards are added to config', async () => {
       const stopA = makeStopFn()
       const stopNew = makeStopFn()

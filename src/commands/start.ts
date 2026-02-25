@@ -33,7 +33,8 @@ The config directory is watched for changes; boards are hot-reloaded
     const config = loadConfig(configDir)
 
     if (config.boards.length === 0) {
-      this.error('No boards configured. Use "5chan board add <address>" to add boards first.')
+      this.log('No boards configured. Waiting for boards to be added...')
+      this.log('Use "5chan board add <address>" to add a board.')
     }
 
     this.log(`Starting board managers for ${config.boards.length} board(s)...`)

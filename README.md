@@ -87,7 +87,9 @@ See [`docker-compose.example.yml`](docker-compose.example.yml) for the full conf
 
 #### Quick usage (Docker, full stack)
 
-Use this flow to create a new board with `bitsocial-cli` and immediately add it to 5chan:
+Use this flow to create a new board with `bitsocial-cli` and immediately add it to 5chan.
+
+> **Note:** The container starts gracefully even with no boards configured — it waits for boards to be added and picks them up automatically via config hot-reload.
 
 ```bash
 wget -O docker-compose.yml https://raw.githubusercontent.com/bitsocialhq/5chan-board-manager/master/docker-compose.example.yml

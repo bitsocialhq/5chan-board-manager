@@ -1,4 +1,4 @@
-import { watch, type FSWatcher } from 'node:fs'
+import { watch, mkdirSync, type FSWatcher } from 'node:fs'
 import { join } from 'node:path'
 import Logger from '@plebbit/plebbit-logger'
 import { startBoardManager } from './board-manager.js'
@@ -181,13 +181,10 @@ export async function startBoardManagers(
     }, 200)
   }
 
-  // Watch boards/ directory
+  // Watch boards/ directory — ensure it exists so the watcher works on first run
   const boardsDir = join(configDir, 'boards')
-  try {
-    watchers.push(watch(boardsDir, triggerReload))
-  } catch {
-    log(`boards directory does not exist yet, skipping watch`)
-  }
+  mkdirSync(boardsDir, { recursive: true })
+  watchers.push(watch(boardsDir, triggerReload))
 
   // Watch global.json
   const globalPath = globalConfigPath(configDir)

@@ -74,9 +74,19 @@ describe('start command', () => {
     dirs.length = 0
   })
 
-  it('errors when no boards are configured', async () => {
+  it('logs waiting message and starts with zero boards when none configured', async () => {
+    const manager = makeMockManager()
+    mockStartManager.mockResolvedValue(manager)
+
     const dir = tmpDir()
-    await expect(runCommand([], dir)).rejects.toThrow('No boards configured')
+    const { stdout } = await runCommand([], dir)
+
+    expect(stdout).toContain('No boards configured')
+    expect(stdout).toContain('Waiting for boards to be added')
+    expect(mockStartManager).toHaveBeenCalledOnce()
+    const [, config] = mockStartManager.mock.calls[0]
+    expect(config.boards).toEqual([])
+    expect(stdout).toContain('Started 0 board manager(s)')
   })
 
   it('starts board managers with correct config', async () => {

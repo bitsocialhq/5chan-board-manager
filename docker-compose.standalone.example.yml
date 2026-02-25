@@ -19,7 +19,9 @@ services:
     volumes:
       - 5chan-data:/data
     environment:
-      - PLEBBIT_RPC_WS_URL=ws://host.docker.internal:9138
+      # Append your bitsocial-cli auth key to the URL.
+      # Find it with: docker logs <bitsocial-container> 2>&1 | grep "secret auth key"
+      - PLEBBIT_RPC_WS_URL=ws://host.docker.internal:9138/YOUR-AUTH-KEY
 
 volumes:
   5chan-data:

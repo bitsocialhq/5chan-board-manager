@@ -110,17 +110,6 @@ jobs:
           echo "ERROR: bitsocial RPC did not become ready in 150s"
           exit 1
 
-      - name: Extract RPC auth key
-        id: rpc
-        run: |
-          AUTH_KEY=$(docker compose logs bitsocial 2>&1 | grep "secret auth key" | grep -oP 'ws://[^/]+/\K\S+' | head -1)
-          if [ -z "$AUTH_KEY" ]; then
-            echo "ERROR: Could not extract RPC auth key from bitsocial logs"
-            docker compose logs bitsocial
-            exit 1
-          fi
-          echo "auth_key=$AUTH_KEY" >> "$GITHUB_OUTPUT"
-
       - name: Create test community
         run: docker compose exec -T bitsocial bitsocial community create
 
@@ -134,8 +123,7 @@ jobs:
       - name: Add board with defaults
         run: |
           docker compose exec -T 5chan \
-            5chan board add "${{ steps.community.outputs.address }}" --apply-defaults \
-            --rpc-url "ws://bitsocial:9138/${{ steps.rpc.outputs.auth_key }}"
+            5chan board add "${{ steps.community.outputs.address }}" --apply-defaults
 
       - name: Verify boardSettings via RPC
         run: |
@@ -217,6 +205,7 @@ jobs:
       - name: Start bitsocial separately
         run: |
           docker run -d --name 5chan-bitsocial-cli -p 9138:9138 \
+            -e PLEBBIT_RPC_AUTH_KEY=ci-test-auth-key \
             ghcr.io/bitsocialhq/bitsocial-cli:latest
 
       - name: Wait for bitsocial RPC
@@ -233,17 +222,6 @@ jobs:
           echo "ERROR: bitsocial RPC did not become ready in 150s"
           exit 1
 
-      - name: Extract RPC auth key
-        id: rpc
-        run: |
-          AUTH_KEY=$(docker logs 5chan-bitsocial-cli 2>&1 | grep "secret auth key" | grep -oP 'ws://[^/]+/\K\S+' | head -1)
-          if [ -z "$AUTH_KEY" ]; then
-            echo "ERROR: Could not extract RPC auth key from bitsocial logs"
-            docker logs 5chan-bitsocial-cli
-            exit 1
-          fi
-          echo "auth_key=$AUTH_KEY" >> "$GITHUB_OUTPUT"
-
       - name: Prepare compose files
         run: |
           cp docker-compose.standalone.example.yml docker-compose.yml
@@ -253,6 +231,8 @@ jobs:
             5chan:
               image: 5chan-board-manager:ci-test
               command: ["sleep", "infinity"]
+              environment:
+                - PLEBBIT_RPC_WS_URL=ws://host.docker.internal:9138/ci-test-auth-key
           EOF
 
       - name: Start 5chan
@@ -271,8 +251,7 @@ jobs:
       - name: Add board with defaults
         run: |
           docker compose exec -T 5chan \
-            5chan board add "${{ steps.community.outputs.address }}" --apply-defaults \
-            --rpc-url "ws://host.docker.internal:9138/${{ steps.rpc.outputs.auth_key }}"
+            5chan board add "${{ steps.community.outputs.address }}" --apply-defaults
 
       - name: Verify boardSettings via RPC
         run: |

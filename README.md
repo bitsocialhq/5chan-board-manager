@@ -89,6 +89,11 @@ See [`docker-compose.example.yml`](docker-compose.example.yml) for the full conf
 
 Use this flow to create a new board with `bitsocial-cli` and immediately add it to 5chan.
 
+> **Note:** The compose file ships with a pre-configured RPC auth key so both containers can connect out of the box. For production, replace it with your own random string:
+> ```bash
+> sed -i "s/TFCh0joRU60KwlfVaprP2uenw7NCdAwsBCF5UDoVg/$(openssl rand -base64 32 | tr -d '/+=')/g" docker-compose.yml
+> ```
+
 > **Note:** The container starts gracefully even with no boards configured — it waits for boards to be added and picks them up automatically via config hot-reload.
 
 ```bash
@@ -115,15 +120,15 @@ If you **already** have bitsocial-cli running separately (on the host, in anothe
 
 ```bash
 cp docker-compose.standalone.example.yml docker-compose.yml
-# Edit PLEBBIT_RPC_WS_URL in docker-compose.yml to point at your running bitsocial-cli
-# Add boards via 5chan board add (see Config Directory Layout above)
+# Edit PLEBBIT_RPC_WS_URL in docker-compose.yml — replace YOUR-AUTH-KEY with
+# your bitsocial-cli auth key (find it with: docker logs <bitsocial-container> 2>&1 | grep "secret auth key")
 docker compose up -d
 ```
 
-Set `PLEBBIT_RPC_WS_URL` to the address of your existing instance:
+Set `PLEBBIT_RPC_WS_URL` to the address of your existing instance, **including the auth key** as a path segment:
 
-- **bitsocial-cli on the host (no container):** Use `ws://host.docker.internal:9138`. The example compose file includes `extra_hosts: ["host.docker.internal:host-gateway"]` so this works on Linux, macOS, and Windows.
-- **bitsocial-cli in another Docker container/network:** Use the container or service name, e.g. `ws://bitsocial:9138`, and make sure both containers share the same Docker network.
+- **bitsocial-cli on the host (no container):** Use `ws://host.docker.internal:9138/YOUR-AUTH-KEY`. The example compose file includes `extra_hosts: ["host.docker.internal:host-gateway"]` so this works on Linux, macOS, and Windows.
+- **bitsocial-cli in another Docker container/network:** Use the container or service name, e.g. `ws://bitsocial:9138/YOUR-AUTH-KEY`, and make sure both containers share the same Docker network.
 
 See [`docker-compose.standalone.example.yml`](docker-compose.standalone.example.yml) for the configuration.
 

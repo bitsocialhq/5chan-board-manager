@@ -18,6 +18,10 @@ services:
     volumes:
       - bitsocial-data:/data
       - bitsocial-logs:/logs
+    environment:
+      # Fixed RPC auth key so 5chan can connect without extracting it from logs.
+      # Change this to your own random string (e.g.: openssl rand -base64 32 | tr -d '/+=')
+      - PLEBBIT_RPC_AUTH_KEY=TFCh0joRU60KwlfVaprP2uenw7NCdAwsBCF5UDoVg
     # Increase UDP buffer limits for QUIC transport (used by Kubo/IPFS).
     # Prevents: "failed to sufficiently increase receive buffer size" warning.
     sysctls:
@@ -40,10 +44,8 @@ services:
     volumes:
       - 5chan-data:/data
     environment:
-      # The auth key path is required for remote RPC connections.
-      # Find it with: docker compose logs bitsocial 2>&1 | grep "secret auth key"
-      # Example: ws://bitsocial:9138/YourAuthKeyHere
-      - PLEBBIT_RPC_WS_URL=ws://bitsocial:9138
+      # Must match PLEBBIT_RPC_AUTH_KEY on the bitsocial service above
+      - PLEBBIT_RPC_WS_URL=ws://bitsocial:9138/TFCh0joRU60KwlfVaprP2uenw7NCdAwsBCF5UDoVg
 
 volumes:
   bitsocial-data:

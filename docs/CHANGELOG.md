@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.8](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.7...v0.1.8) (2026-02-25)
+
+### Bug Fixes
+
+* **docker:** increase UDP buffer limits to silence QUIC warning ([f18c580](https://github.com/bitsocialhq/5chan-board-manager/commit/f18c58005a8e7e87e43516e48b16c9cb7eb365c8))
+* **docker:** limit DEBUG logging to daemon commands only ([a2225b8](https://github.com/bitsocialhq/5chan-board-manager/commit/a2225b839a70c9a05d1da5c19b38561df45887a3))
+* **docker:** rename bitsocial container to 5chan-bitsocial-cli to avoid name conflicts ([6c7718f](https://github.com/bitsocialhq/5chan-board-manager/commit/6c7718fd9b2c6bbb6fa63f6617ac607034ffa8fd))
+* **start:** wait gracefully when no boards configured instead of crashing ([bd3cb88](https://github.com/bitsocialhq/5chan-board-manager/commit/bd3cb8843403d9681c0c2f336ae6f220ff655ebf))
+
 ## [0.1.7](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.6...v0.1.7) (2026-02-25)
 
 ### Bug Fixes

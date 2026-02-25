@@ -95,11 +95,11 @@ docker compose up -d
 
 # Create a community (copy the created address from output)
 docker compose exec bitsocial bitsocial community create \
-  --title "My Board" \
-  --description "Managed by 5chan"
+  --title "My Board title" \
+  --description "My Board description"
 
 # Add the created community to 5chan board manager
-docker compose exec 5chan 5chan board add <community-address> --apply-defaults
+docker compose exec -it 5chan 5chan board add <community-address>
 
 # Verify it was added
 docker compose exec 5chan 5chan board list

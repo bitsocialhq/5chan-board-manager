@@ -10,9 +10,10 @@ RUN npm ci --ignore-scripts && npm rebuild
 
 COPY src/ src/
 COPY bin/ bin/
+COPY scripts/ scripts/
 COPY tsconfig.json ./
 
-RUN npx tsc
+RUN npm run build
 
 # ---- Production dependencies ----
 FROM node:22-slim AS deps

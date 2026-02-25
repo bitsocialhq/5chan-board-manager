@@ -11,6 +11,8 @@ on:
       - 'src/**'
       - 'e2e/**'
       - '.github/**'
+      - 'Dockerfile'
+      - 'docker-compose*.yml'
   pull_request:
     paths:
       - 'package.json'
@@ -21,6 +23,8 @@ on:
       - 'src/**'
       - 'e2e/**'
       - '.github/**'
+      - 'Dockerfile'
+      - 'docker-compose*.yml'
 
 jobs:
   test:

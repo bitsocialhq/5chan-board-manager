@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.12](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.11...v0.1.12) (2026-02-25)
+
+### Bug Fixes
+
+* **ci:** use dedicated compose file without sysctls for full-stack job ([f722954](https://github.com/bitsocialhq/5chan-board-manager/commit/f722954d1c4bbbc2a2708e37a8163a825995bb38))
+
 ## [0.1.11](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.10...v0.1.11) (2026-02-25)
 
 ### Reverts

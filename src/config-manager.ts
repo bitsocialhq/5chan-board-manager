@@ -64,6 +64,10 @@ export function loadGlobalConfig(configDir: string): GlobalConfig {
     throw new Error(`Global config "${filePath}": "stateDir" must be a string`)
   }
 
+  if (config.userAgent !== undefined && typeof config.userAgent !== 'string') {
+    throw new Error(`Global config "${filePath}": "userAgent" must be a string`)
+  }
+
   if (config.defaults !== undefined) {
     if (typeof config.defaults !== 'object' || config.defaults === null || Array.isArray(config.defaults)) {
       throw new Error(`Global config "${filePath}": "defaults" must be an object`)

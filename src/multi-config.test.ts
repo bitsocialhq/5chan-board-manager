@@ -283,4 +283,21 @@ describe('resolveBoardManagerOptions', () => {
     const opts = resolveBoardManagerOptions(board, config)
     expect(opts.moderationReasons).toBeUndefined()
   })
+
+  it('passes userAgent from config', () => {
+    const board: BoardConfig = { address: 'a.bso' }
+    const config: MultiBoardConfig = {
+      userAgent: 'custom-agent:2.0',
+      boards: [board],
+    }
+    const opts = resolveBoardManagerOptions(board, config)
+    expect(opts.userAgent).toBe('custom-agent:2.0')
+  })
+
+  it('leaves userAgent undefined when not set in config', () => {
+    const board: BoardConfig = { address: 'a.bso' }
+    const config: MultiBoardConfig = { boards: [board] }
+    const opts = resolveBoardManagerOptions(board, config)
+    expect(opts.userAgent).toBeUndefined()
+  })
 })

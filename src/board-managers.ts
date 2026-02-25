@@ -249,6 +249,7 @@ function diffConfigsWithGlobal(
   const globalChanged =
     oldConfig.rpcUrl !== newConfig.rpcUrl ||
     oldConfig.stateDir !== newConfig.stateDir ||
+    oldConfig.userAgent !== newConfig.userAgent ||
     JSON.stringify(oldConfig.defaults) !== JSON.stringify(newConfig.defaults)
 
   const changed: MultiBoardConfig['boards'] = []

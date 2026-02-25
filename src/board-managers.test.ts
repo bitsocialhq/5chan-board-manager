@@ -211,6 +211,36 @@ describe('startBoardManagers', () => {
       await manager.stop()
     })
 
+    it('restarts all boards when userAgent changes in global config', async () => {
+      const stopA = makeStopFn()
+      const stopNew = makeStopFn()
+      mockStartBoardManager
+        .mockResolvedValueOnce({ stop: stopA })
+        .mockResolvedValueOnce({ stop: stopNew })
+
+      const dir = tmpDir()
+      writeGlobalConfig(dir, { userAgent: 'old-agent:1.0' })
+      writeBoardConfig(dir, { address: 'a.bso' })
+      const config: MultiBoardConfig = {
+        userAgent: 'old-agent:1.0',
+        boards: [{ address: 'a.bso' }],
+      }
+
+      const manager = await startBoardManagers(dir, config)
+      expect(manager.boardManagers.size).toBe(1)
+
+      // Update global config with changed userAgent
+      writeGlobalConfig(dir, { userAgent: 'new-agent:2.0' })
+
+      // Wait for debounce + async handling
+      await new Promise((r) => setTimeout(r, 500))
+
+      expect(stopA).toHaveBeenCalledOnce()
+      expect(mockStartBoardManager).toHaveBeenCalledTimes(2)
+
+      await manager.stop()
+    })
+
     it('records error when restart of changed board fails', async () => {
       const stopA = makeStopFn()
       mockStartBoardManager

@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { createRequire } from 'node:module'
 import { connectToPlebbitRpc } from './plebbit-rpc.js'
 import type { PlebbitInstance } from './types.js'
+
+const require = createRequire(import.meta.url)
+const { version } = require('../package.json') as { version: string }
 
 vi.mock('@plebbit/plebbit-js', () => ({
   default: vi.fn(),
@@ -71,7 +75,7 @@ describe('connectToPlebbitRpc', () => {
     expect(errorHandlers).toHaveLength(1)
   })
 
-  it('passes correct RPC options to Plebbit constructor', async () => {
+  it('passes correct RPC options to Plebbit constructor with default userAgent', async () => {
     const { instance } = createMockInstance()
     ;(instance.once as ReturnType<typeof vi.fn>).mockImplementation((_event: string, cb: Listener) => {
       cb()
@@ -82,6 +86,22 @@ describe('connectToPlebbitRpc', () => {
 
     expect(mockPlebbit).toHaveBeenCalledWith({
       plebbitRpcClientsOptions: ['ws://custom:9138'],
+      userAgent: `5chan-board-manager:${version}`,
+    })
+  })
+
+  it('passes custom userAgent when provided', async () => {
+    const { instance } = createMockInstance()
+    ;(instance.once as ReturnType<typeof vi.fn>).mockImplementation((_event: string, cb: Listener) => {
+      cb()
+    })
+    mockPlebbit.mockResolvedValue(instance)
+
+    await connectToPlebbitRpc('ws://custom:9138', 'my-custom-agent:1.0')
+
+    expect(mockPlebbit).toHaveBeenCalledWith({
+      plebbitRpcClientsOptions: ['ws://custom:9138'],
+      userAgent: 'my-custom-agent:1.0',
     })
   })
 })

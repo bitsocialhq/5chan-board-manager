@@ -41,6 +41,7 @@ export function resolveBoardManagerOptions(board: BoardConfig, config: MultiBoar
     subplebbitAddress: board.address,
     plebbitRpcUrl: rpcUrl,
     stateDir: config.stateDir,
+    userAgent: config.userAgent,
     perPage: board.perPage ?? config.defaults?.perPage,
     pages: board.pages ?? config.defaults?.pages,
     bumpLimit: board.bumpLimit ?? config.defaults?.bumpLimit,

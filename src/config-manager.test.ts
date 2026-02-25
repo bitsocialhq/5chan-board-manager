@@ -138,6 +138,20 @@ describe('loadConfig', () => {
     expect(() => loadConfig(dir)).toThrow('"stateDir" must be a string')
   })
 
+  it('throws when userAgent is not a string', () => {
+    const dir = tmpDir()
+    writeGlobalConfig(dir, { userAgent: 123 })
+    expect(() => loadConfig(dir)).toThrow('"userAgent" must be a string')
+  })
+
+  it('accepts valid userAgent string', () => {
+    const dir = tmpDir()
+    writeGlobalConfig(dir, { userAgent: 'custom-agent:1.0' })
+    writeBoardConfig(dir, { address: 'x.bso' })
+    const config = loadConfig(dir)
+    expect(config.userAgent).toBe('custom-agent:1.0')
+  })
+
   it('throws when defaults is not an object', () => {
     const dir = tmpDir()
     writeGlobalConfig(dir, { defaults: 'bad' })

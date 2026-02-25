@@ -23,6 +23,7 @@ const DEFAULTS = {
 export async function startBoardManager(options: BoardManagerOptions): Promise<BoardManagerResult> {
   const {
     plebbitRpcUrl,
+    userAgent,
     perPage = DEFAULTS.perPage,
     pages = DEFAULTS.pages,
     bumpLimit = DEFAULTS.bumpLimit,
@@ -55,7 +56,7 @@ export async function startBoardManager(options: BoardManagerOptions): Promise<B
 
   log(`starting board manager for ${subplebbitAddress} (capacity=${maxThreads}, bumpLimit=${bumpLimit}, purgeAfter=${archivePurgeSeconds}s)`)
 
-  const plebbit = await connectToPlebbitRpc(plebbitRpcUrl)
+  const plebbit = await connectToPlebbitRpc(plebbitRpcUrl, userAgent)
 
   async function ensureModRole(subplebbit: Subplebbit, signerAddress: string): Promise<void> {
     const roles = subplebbit.roles ?? {}

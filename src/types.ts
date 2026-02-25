@@ -29,6 +29,7 @@ export interface BoardManagerOptions {
   subplebbitAddress: string
   plebbitRpcUrl: string
   stateDir?: string
+  userAgent?: string
   perPage?: number
   pages?: number
   bumpLimit?: number
@@ -82,6 +83,7 @@ export interface BoardDefaults {
 export interface GlobalConfig {
   rpcUrl?: string
   stateDir?: string
+  userAgent?: string
   defaults?: BoardDefaults
 }
 
@@ -89,6 +91,7 @@ export interface GlobalConfig {
 export interface MultiBoardConfig {
   rpcUrl?: string
   stateDir?: string
+  userAgent?: string
   defaults?: BoardDefaults
   boards: BoardConfig[]
 }

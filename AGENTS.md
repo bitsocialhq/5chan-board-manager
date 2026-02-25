@@ -4,6 +4,6 @@
 - Never use `any` — always use proper types
 - After modifying any file under `src/`, run `npx tsc --noEmit` to verify the build has no type errors, then run `npm run build` so `dist/` stays in sync
 - After modifying types in `src/types.ts`, run `npx tsc --noEmit` to ensure all dependents still compile
-- All code must work on Linux, macOS, and Windows — avoid platform-specific assumptions (paths, line endings, shell commands, etc.)
+- The project runs exclusively in Docker (Linux containers) — no need to support macOS or Windows natively
 - Assume environment is node v22+
 - When changing functionality (new features, refactors, CLI changes, etc.), update README.md if the change affects documented behavior, commands, APIs, or examples

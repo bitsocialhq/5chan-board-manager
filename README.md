@@ -78,7 +78,7 @@ All fields except each board's `address` are optional:
 If you **don't** already have [bitsocial-cli](https://github.com/bitsocialhq/bitsocial-cli) running, use the full stack compose file which boots both bitsocial-cli (Plebbit RPC server) and 5chan together.:
 
 ```bash
-cp docker-compose.example.yml docker-compose.yml
+wget -O docker-compose.yml https://raw.githubusercontent.com/bitsocialhq/5chan-board-manager/master/docker-compose.example.yml
 # Add boards via 5chan board add (see Config Directory Layout above)
 docker compose up -d
 ```
@@ -90,7 +90,7 @@ See [`docker-compose.example.yml`](docker-compose.example.yml) for the full conf
 Use this flow to create a new board with `bitsocial-cli` and immediately add it to 5chan:
 
 ```bash
-cp docker-compose.example.yml docker-compose.yml
+wget -O docker-compose.yml https://raw.githubusercontent.com/bitsocialhq/5chan-board-manager/master/docker-compose.example.yml
 docker compose up -d
 
 # Create a community (copy the created address from output)

@@ -39,7 +39,7 @@ COPY --from=deps /app/node_modules/ node_modules/
 COPY --from=builder /app/dist/ dist/
 COPY package.json ./
 COPY bin/ bin/
-RUN chmod +x bin/run.js
+RUN chmod +x bin/run.js bin/docker-entrypoint.sh
 RUN ln -s /app/bin/run.js /usr/local/bin/5chan
 
 RUN mkdir -p /data && chown -R 5chan:5chan /data /app
@@ -48,9 +48,8 @@ USER 5chan
 
 ENV XDG_DATA_HOME=/data
 ENV XDG_CONFIG_HOME=/data
-ENV DEBUG=5chan:*
 
 VOLUME ["/data"]
 
-ENTRYPOINT ["tini", "--"]
+ENTRYPOINT ["tini", "--", "/app/bin/docker-entrypoint.sh"]
 CMD ["5chan", "start"]

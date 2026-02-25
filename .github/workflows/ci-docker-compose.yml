@@ -56,13 +56,13 @@ jobs:
           cp docker-compose.example.yml docker-compose.yml
 
           cat > docker-compose.override.yml <<'EOF'
-          services:
-            bitsocial:
-              sysctls: []
-            5chan:
-              image: 5chan-board-manager:ci-test
-              command: ["sleep", "infinity"]
-          EOF
+services:
+  bitsocial:
+    sysctls: []
+  5chan:
+    image: 5chan-board-manager:ci-test
+    command: ["sleep", "infinity"]
+EOF
 
       - name: Start services
         run: docker compose up -d --wait
@@ -222,11 +222,11 @@ jobs:
           cp docker-compose.standalone.example.yml docker-compose.yml
 
           cat > docker-compose.override.yml <<'EOF'
-          services:
-            5chan:
-              image: 5chan-board-manager:ci-test
-              command: ["sleep", "infinity"]
-          EOF
+services:
+  5chan:
+    image: 5chan-board-manager:ci-test
+    command: ["sleep", "infinity"]
+EOF
 
       - name: Start 5chan
         run: docker compose up -d

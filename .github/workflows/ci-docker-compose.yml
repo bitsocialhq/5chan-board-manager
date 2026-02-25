@@ -187,14 +187,14 @@ jobs:
 
       - name: Start bitsocial separately
         run: |
-          docker run -d --name bitsocial -p 9138:9138 \
+          docker run -d --name 5chan-bitsocial-cli -p 9138:9138 \
             ghcr.io/bitsocialhq/bitsocial-cli:latest
 
       - name: Wait for bitsocial RPC
         run: |
           echo "Waiting for bitsocial RPC to become ready..."
           for i in $(seq 1 30); do
-            if docker exec bitsocial bitsocial community list 2>/dev/null; then
+            if docker exec 5chan-bitsocial-cli bitsocial community list 2>/dev/null; then
               echo "bitsocial RPC is ready"
               exit 0
             fi
@@ -207,10 +207,10 @@ jobs:
       - name: Extract RPC auth key
         id: rpc
         run: |
-          AUTH_KEY=$(docker logs bitsocial 2>&1 | grep "secret auth key" | grep -oP 'ws://[^/]+/\K\S+' | head -1)
+          AUTH_KEY=$(docker logs 5chan-bitsocial-cli 2>&1 | grep "secret auth key" | grep -oP 'ws://[^/]+/\K\S+' | head -1)
           if [ -z "$AUTH_KEY" ]; then
             echo "ERROR: Could not extract RPC auth key from bitsocial logs"
-            docker logs bitsocial
+            docker logs 5chan-bitsocial-cli
             exit 1
           fi
           echo "auth_key=$AUTH_KEY" >> "$GITHUB_OUTPUT"
@@ -230,12 +230,12 @@ jobs:
         run: docker compose up -d
 
       - name: Create test community
-        run: docker exec bitsocial bitsocial community create
+        run: docker exec 5chan-bitsocial-cli bitsocial community create
 
       - name: Extract community address
         id: community
         run: |
-          ADDRESS=$(docker exec bitsocial bitsocial community list -q | head -n1 | tr -d '[:space:]')
+          ADDRESS=$(docker exec 5chan-bitsocial-cli bitsocial community list -q | head -n1 | tr -d '[:space:]')
           echo "address=$ADDRESS" >> "$GITHUB_OUTPUT"
           echo "Community address: $ADDRESS"
 
@@ -247,7 +247,7 @@ jobs:
 
       - name: Verify boardSettings via RPC
         run: |
-          COMMUNITY_JSON=$(docker exec bitsocial \
+          COMMUNITY_JSON=$(docker exec 5chan-bitsocial-cli \
             bitsocial community get "${{ steps.community.outputs.address }}")
 
           echo "$COMMUNITY_JSON" | jq .
@@ -288,10 +288,10 @@ jobs:
         if: failure()
         run: |
           docker compose logs
-          docker logs bitsocial
+          docker logs 5chan-bitsocial-cli
 
       - name: Cleanup
         if: always()
         run: |
           docker compose down -v
-          docker rm -f bitsocial || true
+          docker rm -f 5chan-bitsocial-cli || true

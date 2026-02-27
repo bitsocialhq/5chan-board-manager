@@ -29,9 +29,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -54,7 +51,19 @@ jobs:
           path: /tmp/5chan-image.tar
           retention-days: 1
 
-      - name: Warm arm64 cache
+  warm-cache:
+    name: Warm multi-arch cache
+    if: ${{ github.event_name == 'pull_request' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build multi-arch (cache only)
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -317,8 +326,12 @@ jobs:
 
   publish:
     name: Publish Docker image
-    needs: [full-stack, standalone]
-    if: ${{ github.event_name == 'workflow_run' }}
+    needs: [full-stack, standalone, warm-cache]
+    if: |
+      always() &&
+      github.event_name == 'workflow_run' &&
+      needs.full-stack.result == 'success' &&
+      needs.standalone.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read

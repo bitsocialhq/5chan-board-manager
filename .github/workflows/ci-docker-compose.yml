@@ -69,8 +69,10 @@ jobs:
           context: .
           push: false
           platforms: linux/amd64,linux/arm64
-          cache-from: type=gha,scope=build
-          cache-to: type=gha,mode=max,scope=build
+          cache-from: |
+            type=gha,scope=warm
+            type=gha,scope=publish
+          cache-to: type=gha,mode=max,scope=warm
 
   full-stack:
     name: Full-stack (bitsocial + 5chan)
@@ -381,6 +383,6 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: |
-            type=gha,scope=build
+            type=gha,scope=warm
             type=gha,scope=publish
           cache-to: type=gha,mode=max,scope=publish

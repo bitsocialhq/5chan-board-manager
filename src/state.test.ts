@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, readFileSync, existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { tmpdir } from 'node:os'
+import { tmpdir, hostname } from 'node:os'
 import { loadState, saveState, defaultStateDir, isPidAlive, acquireLock } from './state.js'
 import type { BoardManagerState } from './types.js'
 
@@ -143,11 +143,13 @@ describe('state', () => {
   })
 
   describe('acquireLock', () => {
-    it('creates .lock file with current PID', () => {
+    it('creates .lock file with current PID and hostname', () => {
       const lock = acquireLock(statePath)
       expect(existsSync(statePath + '.lock')).toBe(true)
-      const pid = readFileSync(statePath + '.lock', 'utf-8').trim()
-      expect(Number(pid)).toBe(process.pid)
+      const content = readFileSync(statePath + '.lock', 'utf-8').trim()
+      const [pidStr, host] = content.split('\n')
+      expect(Number(pidStr)).toBe(process.pid)
+      expect(host).toBe(hostname())
       lock.release()
     })
 
@@ -160,10 +162,31 @@ describe('state', () => {
     })
 
     it('recovers stale lock from dead PID', () => {
+      writeFileSync(statePath + '.lock', `999999\n${hostname()}`)
+      const lock = acquireLock(statePath)
+      const content = readFileSync(statePath + '.lock', 'utf-8').trim()
+      const [pidStr] = content.split('\n')
+      expect(Number(pidStr)).toBe(process.pid)
+      lock.release()
+    })
+
+    it('recovers stale lock from different hostname even if PID is alive', () => {
+      // Use current PID (alive) but a different hostname to simulate Docker restart
+      writeFileSync(statePath + '.lock', `${process.pid}\nold-container-id`)
+      const lock = acquireLock(statePath)
+      const content = readFileSync(statePath + '.lock', 'utf-8').trim()
+      const [pidStr, host] = content.split('\n')
+      expect(Number(pidStr)).toBe(process.pid)
+      expect(host).toBe(hostname())
+      lock.release()
+    })
+
+    it('recovers old-format lock file (PID only, no hostname) with dead PID', () => {
       writeFileSync(statePath + '.lock', '999999')
       const lock = acquireLock(statePath)
-      const pid = readFileSync(statePath + '.lock', 'utf-8').trim()
-      expect(Number(pid)).toBe(process.pid)
+      const content = readFileSync(statePath + '.lock', 'utf-8').trim()
+      const [pidStr] = content.split('\n')
+      expect(Number(pidStr)).toBe(process.pid)
       lock.release()
     })
 

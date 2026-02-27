@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { join } from 'node:path'
 import { startMultiBoardManager } from './multi-runner.js'
 import type { BoardManagerOptions, BoardManagerResult, MultiBoardConfig } from './types.js'
 
@@ -33,7 +34,7 @@ describe('startMultiBoardManager', () => {
       .mockResolvedValueOnce({ stop: stopA })
       .mockResolvedValueOnce({ stop: stopB })
 
-    const result = await startMultiBoardManager(makeConfig())
+    const result = await startMultiBoardManager(makeConfig(), '/test/config')
 
     expect(result.boardManagers.size).toBe(2)
     expect(result.boardManagers.has('a.bso')).toBe(true)
@@ -46,17 +47,16 @@ describe('startMultiBoardManager', () => {
 
     const config = makeConfig({
       rpcUrl: 'ws://test:9138',
-      stateDir: '/test/state',
       defaults: { perPage: 20 },
       boards: [{ address: 'x.bso', bumpLimit: 500 }],
     })
 
-    await startMultiBoardManager(config)
+    await startMultiBoardManager(config, '/test/config')
 
     const opts = mockStartBoardManager.mock.calls[0][0] as BoardManagerOptions
     expect(opts.subplebbitAddress).toBe('x.bso')
     expect(opts.plebbitRpcUrl).toBe('ws://test:9138')
-    expect(opts.stateDir).toBe('/test/state')
+    expect(opts.boardDir).toBe(join('/test/config', 'boards', 'x.bso'))
     expect(opts.perPage).toBe(20)
     expect(opts.bumpLimit).toBe(500)
   })
@@ -66,7 +66,7 @@ describe('startMultiBoardManager', () => {
       .mockRejectedValueOnce(new Error('connection refused'))
       .mockResolvedValueOnce({ stop: makeStopFn() })
 
-    const result = await startMultiBoardManager(makeConfig())
+    const result = await startMultiBoardManager(makeConfig(), '/test/config')
 
     expect(result.boardManagers.size).toBe(1)
     expect(result.boardManagers.has('b.bso')).toBe(true)
@@ -77,7 +77,7 @@ describe('startMultiBoardManager', () => {
   it('throws AggregateError when ALL boards fail', async () => {
     mockStartBoardManager.mockRejectedValue(new Error('fail'))
 
-    await expect(startMultiBoardManager(makeConfig())).rejects.toThrow(AggregateError)
+    await expect(startMultiBoardManager(makeConfig(), '/test/config')).rejects.toThrow(AggregateError)
   })
 
   it('AggregateError contains all individual errors', async () => {
@@ -86,7 +86,7 @@ describe('startMultiBoardManager', () => {
       .mockRejectedValueOnce(new Error('fail-b'))
 
     try {
-      await startMultiBoardManager(makeConfig())
+      await startMultiBoardManager(makeConfig(), '/test/config')
       expect.unreachable('should have thrown')
     } catch (err) {
       expect(err).toBeInstanceOf(AggregateError)
@@ -106,7 +106,7 @@ describe('startMultiBoardManager', () => {
 
     await startMultiBoardManager(makeConfig({
       boards: [{ address: 'first.bso' }, { address: 'second.bso' }, { address: 'third.bso' }],
-    }))
+    }), '/test/config')
 
     expect(order).toEqual(['first.bso', 'second.bso', 'third.bso'])
   })
@@ -119,7 +119,7 @@ describe('startMultiBoardManager', () => {
         .mockResolvedValueOnce({ stop: stopA })
         .mockResolvedValueOnce({ stop: stopB })
 
-      const result = await startMultiBoardManager(makeConfig())
+      const result = await startMultiBoardManager(makeConfig(), '/test/config')
       await result.stop()
 
       expect(stopA).toHaveBeenCalledOnce()
@@ -133,7 +133,7 @@ describe('startMultiBoardManager', () => {
         .mockResolvedValueOnce({ stop: stopA })
         .mockResolvedValueOnce({ stop: stopB })
 
-      const result = await startMultiBoardManager(makeConfig())
+      const result = await startMultiBoardManager(makeConfig(), '/test/config')
       // Should not throw even though stopA fails
       await result.stop()
 
@@ -147,7 +147,7 @@ describe('startMultiBoardManager', () => {
       .mockRejectedValueOnce('string error')
       .mockResolvedValueOnce({ stop: makeStopFn() })
 
-    const result = await startMultiBoardManager(makeConfig())
+    const result = await startMultiBoardManager(makeConfig(), '/test/config')
 
     expect(result.errors.get('a.bso')?.message).toBe('string error')
   })

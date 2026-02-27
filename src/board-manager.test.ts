@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, mkdirSync, rmSync, existsSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, existsSync, writeFileSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { loadState, saveState } from './state.js'
@@ -82,11 +82,12 @@ function createMockSubplebbit(postsConfig: {
 
 describe('board manager logic', () => {
   let dir: string
-  let stateDir: string
+  let boardDir: string
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'board-manager-test-'))
-    stateDir = join(dir, 'states')
+    boardDir = join(dir, 'boards', 'board.bso')
+    mkdirSync(boardDir, { recursive: true })
   })
 
   afterEach(() => {
@@ -95,7 +96,7 @@ describe('board manager logic', () => {
 
   describe('state-based thread tracking', () => {
     it('records archivedTimestamp when adding an archived thread', () => {
-      const filePath = join(stateDir, 'test.json')
+      const filePath = join(dir, 'test-state.json')
       const state: BoardManagerState = { signers: {}, archivedThreads: {} }
       const now = Math.floor(Date.now() / 1000)
       state.archivedThreads['QmTest'] = { archivedTimestamp: now }
@@ -106,7 +107,7 @@ describe('board manager logic', () => {
     })
 
     it('removes thread from state on purge', () => {
-      const filePath = join(stateDir, 'test.json')
+      const filePath = join(dir, 'test-state.json')
       const state: BoardManagerState = {
         signers: {},
         archivedThreads: {
@@ -261,7 +262,7 @@ describe('board manager logic', () => {
 
   describe('signer management', () => {
     it('persists signer to state file', () => {
-      const filePath = join(stateDir, 'test.json')
+      const filePath = join(dir, 'test-state.json')
       const state: BoardManagerState = { signers: {}, archivedThreads: {} }
       state.signers['my-board.bso'] = { privateKey: 'test-private-key' }
       saveState(filePath, state)
@@ -271,7 +272,7 @@ describe('board manager logic', () => {
     })
 
     it('retrieves existing signer from state', () => {
-      const filePath = join(stateDir, 'test.json')
+      const filePath = join(dir, 'test-state.json')
       const state: BoardManagerState = {
         signers: { 'board.bso': { privateKey: 'existing-key' } },
         archivedThreads: {},
@@ -284,7 +285,7 @@ describe('board manager logic', () => {
     })
 
     it('handles multiple signers for different subplebbits', () => {
-      const filePath = join(stateDir, 'test.json')
+      const filePath = join(dir, 'test-state.json')
       const state: BoardManagerState = {
         signers: {
           'board1.bso': { privateKey: 'key1' },
@@ -390,7 +391,7 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
         perPage: 15,
         pages: 10,
       })
@@ -418,7 +419,7 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
         perPage: 2,
         pages: 1, // capacity = 2, so 3 threads should get archived
       })
@@ -454,7 +455,7 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
         perPage: 1,
         pages: 1, // capacity = 1, so 3 threads should get archived
       })
@@ -495,7 +496,7 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
         perPage: 1,
         pages: 2, // capacity = 2, so 2 threads should get archived
       })
@@ -541,7 +542,7 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
         perPage: 1,
         pages: 1, // capacity = 1, so 3 threads archived
       })
@@ -575,7 +576,7 @@ describe('board manager logic', () => {
       await expect(startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
       })).rejects.toThrow(
         'Signer mock-address-123 does not have a moderator role on remote subplebbit board.bso. Ask the subplebbit owner to add this address as a moderator.'
       )
@@ -597,7 +598,7 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
       })
 
       // Should not have called edit (role already exists)
@@ -621,7 +622,7 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
       })
 
       // Should have called edit to auto-grant moderator role
@@ -631,26 +632,6 @@ describe('board manager logic', () => {
       await boardManager.stop()
     })
 
-    it('uses defaultStateDir when stateDir is not provided', async () => {
-      const { instance } = createMockPlebbit()
-      const mockSub = createMockSubplebbit({
-        pageCids: {},
-        pages: {},
-      })
-      vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
-
-      // No stateDir passed — should use defaultStateDir() without error
-      const boardManager = await startBoardManager({
-        subplebbitAddress: 'board.bso',
-        plebbitRpcUrl: 'ws://localhost:9138',
-        perPage: 15,
-        pages: 10,
-      })
-
-      expect(mockSub.update).toHaveBeenCalled()
-
-      await boardManager.stop()
-    })
   })
 
   describe('update serialization', () => {
@@ -679,7 +660,7 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
         perPage: 15,
         pages: 10,
       })
@@ -734,7 +715,7 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
         perPage: 15,
         pages: 10,
       })
@@ -754,8 +735,7 @@ describe('board manager logic', () => {
 
   describe('process lock', () => {
     it('throws when lock is held by a live PID', async () => {
-      mkdirSync(stateDir, { recursive: true })
-      const lockPath = join(stateDir, 'board.bso.json.lock')
+      const lockPath = join(boardDir, 'state.json.lock')
       writeFileSync(lockPath, String(process.pid))
 
       const { instance } = createMockPlebbit()
@@ -765,13 +745,12 @@ describe('board manager logic', () => {
       await expect(startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
       })).rejects.toThrow(`Another board manager (PID ${process.pid}) is already running for board.bso`)
     })
 
     it('succeeds when lock has stale PID', async () => {
-      mkdirSync(stateDir, { recursive: true })
-      const lockPath = join(stateDir, 'board.bso.json.lock')
+      const lockPath = join(boardDir, 'state.json.lock')
       writeFileSync(lockPath, '999999')
 
       const { instance } = createMockPlebbit()
@@ -781,7 +760,7 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
       })
 
       expect(existsSync(lockPath)).toBe(true)
@@ -796,10 +775,10 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
       })
 
-      const lockPath = join(stateDir, 'board.bso.json.lock')
+      const lockPath = join(boardDir, 'state.json.lock')
       expect(existsSync(lockPath)).toBe(true)
 
       await boardManager.stop()
@@ -812,12 +791,12 @@ describe('board manager logic', () => {
       const mockSub = createMockSubplebbit({ pageCids: {}, pages: {} })
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      const lockPath = join(stateDir, 'board.bso.json.lock')
+      const lockPath = join(boardDir, 'state.json.lock')
 
       const boardManager1 = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
       })
       expect(existsSync(lockPath)).toBe(true)
       await boardManager1.stop()
@@ -831,7 +810,7 @@ describe('board manager logic', () => {
       const boardManager2 = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
       })
       expect(existsSync(lockPath)).toBe(true)
       await boardManager2.stop()
@@ -861,7 +840,7 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
         perPage: 15,
         pages: 10,
       })
@@ -921,7 +900,7 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
         perPage: 15,
         pages: 10,
       })
@@ -957,7 +936,7 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       // Pre-seed state with thread in archivedThreads (recent timestamp to avoid archive-purge)
-      const statePath = join(stateDir, 'board.bso.json')
+      const statePath = join(boardDir, 'state.json')
       saveState(statePath, {
         signers: {},
         archivedThreads: { 'QmArchived': { archivedTimestamp: Math.floor(Date.now() / 1000) } },
@@ -966,7 +945,7 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
         perPage: 15,
         pages: 10,
       })
@@ -1002,7 +981,7 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
         perPage: 15,
         pages: 10,
       })
@@ -1038,7 +1017,7 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
         perPage: 2,
         pages: 1, // capacity = 2, so 3 archived
       })
@@ -1071,7 +1050,7 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
         perPage: 1,
         pages: 1, // capacity = 1, so 3 archived
         moderationReasons: {
@@ -1109,7 +1088,7 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
         perPage: 15,
         pages: 10,
         bumpLimit: 300,
@@ -1142,7 +1121,7 @@ describe('board manager logic', () => {
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
       // Pre-seed state with an old archived thread
-      const statePath = join(stateDir, 'board.bso.json')
+      const statePath = join(boardDir, 'state.json')
       saveState(statePath, {
         signers: {},
         archivedThreads: { 'QmOldArchived': { archivedTimestamp: 0 } },
@@ -1151,7 +1130,7 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
         perPage: 15,
         pages: 10,
         archivePurgeSeconds: 1,
@@ -1190,7 +1169,7 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: 'board.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: boardDir,
         perPage: 15,
         pages: 10,
       })
@@ -1211,6 +1190,9 @@ describe('board manager logic', () => {
 
   describe('address change', () => {
     it('detects address change and migrates state/lock files', async () => {
+      const hashBoardDir = join(dir, 'boards', '12D3KooWHash123')
+      mkdirSync(hashBoardDir, { recursive: true })
+
       const { instance } = createMockPlebbit()
       const mockSub = createMockSubplebbit({
         pageCids: {},
@@ -1221,12 +1203,15 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: '12D3KooWHash123',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: hashBoardDir,
+        onAddressChange: (oldAddr: string, newAddr: string) => {
+          renameSync(join(dir, 'boards', oldAddr), join(dir, 'boards', newAddr))
+        },
       })
 
       // Verify old state/lock files exist
-      expect(existsSync(join(stateDir, '12D3KooWHash123.json'))).toBe(true)
-      expect(existsSync(join(stateDir, '12D3KooWHash123.json.lock'))).toBe(true)
+      expect(existsSync(join(hashBoardDir, 'state.json'))).toBe(true)
+      expect(existsSync(join(hashBoardDir, 'state.json.lock'))).toBe(true)
 
       // Simulate address change
       mockSub.address = 'random.bso'
@@ -1234,17 +1219,17 @@ describe('board manager logic', () => {
 
       // Wait for migration to complete
       await vi.waitFor(() => {
-        expect(existsSync(join(stateDir, 'random.bso.json'))).toBe(true)
+        expect(existsSync(join(dir, 'boards', 'random.bso', 'state.json'))).toBe(true)
       })
 
-      // Old files should be cleaned up
-      expect(existsSync(join(stateDir, '12D3KooWHash123.json'))).toBe(false)
+      // Old directory should no longer exist (directory was renamed)
+      expect(existsSync(join(dir, 'boards', '12D3KooWHash123'))).toBe(false)
 
       // New lock should exist
-      expect(existsSync(join(stateDir, 'random.bso.json.lock'))).toBe(true)
+      expect(existsSync(join(dir, 'boards', 'random.bso', 'state.json.lock'))).toBe(true)
 
       // Verify signer was migrated
-      const newState = loadState(join(stateDir, 'random.bso.json'))
+      const newState = loadState(join(dir, 'boards', 'random.bso', 'state.json'))
       expect(newState.signers['random.bso']).toBeDefined()
       expect(newState.signers['12D3KooWHash123']).toBeUndefined()
 
@@ -1252,6 +1237,9 @@ describe('board manager logic', () => {
     })
 
     it('calls onAddressChange callback with correct args', async () => {
+      const hashBoardDir = join(dir, 'boards', '12D3KooWHash456')
+      mkdirSync(hashBoardDir, { recursive: true })
+
       const { instance } = createMockPlebbit()
       const mockSub = createMockSubplebbit({
         pageCids: {},
@@ -1259,11 +1247,13 @@ describe('board manager logic', () => {
       }, '12D3KooWHash456')
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      const onAddressChange = vi.fn()
+      const onAddressChange = vi.fn().mockImplementation((oldAddr: string, newAddr: string) => {
+        renameSync(join(dir, 'boards', oldAddr), join(dir, 'boards', newAddr))
+      })
       const boardManager = await startBoardManager({
         subplebbitAddress: '12D3KooWHash456',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: hashBoardDir,
         onAddressChange,
       })
 
@@ -1281,6 +1271,9 @@ describe('board manager logic', () => {
     })
 
     it('subsequent moderation uses new address after migration', async () => {
+      const oldBoardDir = join(dir, 'boards', '12D3KooWOld')
+      mkdirSync(oldBoardDir, { recursive: true })
+
       const { instance, publishedModerations } = createMockPlebbit()
       const threads = Array.from({ length: 5 }, (_, i) => mockThread(`QmAddr${i}`))
       const getPage = vi.fn().mockResolvedValue({
@@ -1298,9 +1291,12 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: '12D3KooWOld',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: oldBoardDir,
         perPage: 2,
         pages: 1, // capacity 2, so 3 archived
+        onAddressChange: (oldAddr: string, newAddr: string) => {
+          renameSync(join(dir, 'boards', oldAddr), join(dir, 'boards', newAddr))
+        },
       })
 
       // Wait for initial moderation
@@ -1322,13 +1318,16 @@ describe('board manager logic', () => {
       // The threads are the same, so archived ones won't be re-archived.
       // But we can verify the state was migrated.
       await vi.waitFor(() => {
-        expect(existsSync(join(stateDir, 'new.bso.json'))).toBe(true)
+        expect(existsSync(join(dir, 'boards', 'new.bso', 'state.json'))).toBe(true)
       })
 
       await boardManager.stop()
     })
 
     it('does not migrate when address is unchanged', async () => {
+      const stableBoardDir = join(dir, 'boards', 'stable.bso')
+      mkdirSync(stableBoardDir, { recursive: true })
+
       const { instance } = createMockPlebbit()
       const mockSub = createMockSubplebbit({
         pageCids: {},
@@ -1340,7 +1339,7 @@ describe('board manager logic', () => {
       const boardManager = await startBoardManager({
         subplebbitAddress: 'stable.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: stableBoardDir,
         onAddressChange,
       })
 
@@ -1354,6 +1353,9 @@ describe('board manager logic', () => {
     })
 
     it('gracefully handles lock conflict on new address', async () => {
+      const conflictBoardDir = join(dir, 'boards', '12D3KooWConflict')
+      mkdirSync(conflictBoardDir, { recursive: true })
+
       const { instance } = createMockPlebbit()
       const mockSub = createMockSubplebbit({
         pageCids: {},
@@ -1361,15 +1363,15 @@ describe('board manager logic', () => {
       }, '12D3KooWConflict')
       vi.mocked(instance.getSubplebbit).mockResolvedValue(mockSub as unknown as Awaited<ReturnType<PlebbitInstance['getSubplebbit']>>)
 
-      // Pre-create a lock file for the new address with our own PID (simulating conflict)
-      mkdirSync(stateDir, { recursive: true })
-      writeFileSync(join(stateDir, 'conflict.bso.json.lock'), String(process.pid))
-
-      const onAddressChange = vi.fn()
+      const onAddressChange = vi.fn().mockImplementation((oldAddr: string, newAddr: string) => {
+        renameSync(join(dir, 'boards', oldAddr), join(dir, 'boards', newAddr))
+        // Create a conflicting lock file with current PID at the new location
+        writeFileSync(join(dir, 'boards', newAddr, 'state.json.lock'), String(process.pid))
+      })
       const boardManager = await startBoardManager({
         subplebbitAddress: '12D3KooWConflict',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: conflictBoardDir,
         onAddressChange,
       })
 
@@ -1378,12 +1380,13 @@ describe('board manager logic', () => {
       mockSub._triggerUpdate()
       await new Promise((r) => setTimeout(r, 100))
 
-      // Migration should fail gracefully — callback not called
-      expect(onAddressChange).not.toHaveBeenCalled()
+      // onAddressChange was called (rename happened), but lock acquisition failed
+      // so rollback calls onAddressChange again to rename back
+      expect(onAddressChange).toHaveBeenCalledTimes(2)
 
-      // Original state/lock should still exist (rollback)
-      expect(existsSync(join(stateDir, '12D3KooWConflict.json'))).toBe(true)
-      expect(existsSync(join(stateDir, '12D3KooWConflict.json.lock'))).toBe(true)
+      // Original state/lock should still exist (rollback renamed dir back)
+      expect(existsSync(join(dir, 'boards', '12D3KooWConflict', 'state.json'))).toBe(true)
+      expect(existsSync(join(dir, 'boards', '12D3KooWConflict', 'state.json.lock'))).toBe(true)
 
       await boardManager.stop()
     })
@@ -1391,6 +1394,11 @@ describe('board manager logic', () => {
 
   describe('per-subplebbit state isolation', () => {
     it('two board managers for different subplebbits use separate state files', async () => {
+      const board1Dir = join(dir, 'boards', 'board1.bso')
+      const board2Dir = join(dir, 'boards', 'board2.bso')
+      mkdirSync(board1Dir, { recursive: true })
+      mkdirSync(board2Dir, { recursive: true })
+
       // First board manager for board1.bso
       const { instance: instance1 } = createMockPlebbit()
       const mockSub1 = createMockSubplebbit({
@@ -1406,7 +1414,7 @@ describe('board manager logic', () => {
       const boardManager1 = await startBoardManager({
         subplebbitAddress: 'board1.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: board1Dir,
         perPage: 15,
         pages: 10,
       })
@@ -1426,20 +1434,20 @@ describe('board manager logic', () => {
       const boardManager2 = await startBoardManager({
         subplebbitAddress: 'board2.bso',
         plebbitRpcUrl: 'ws://localhost:9138',
-        stateDir,
+        boardDir: board2Dir,
         perPage: 15,
         pages: 10,
       })
 
       // Wait for both board managers to process
       await vi.waitFor(() => {
-        expect(existsSync(join(stateDir, 'board1.bso.json'))).toBe(true)
-        expect(existsSync(join(stateDir, 'board2.bso.json'))).toBe(true)
+        expect(existsSync(join(board1Dir, 'state.json'))).toBe(true)
+        expect(existsSync(join(board2Dir, 'state.json'))).toBe(true)
       })
 
       // Verify each state file has its own signer and they don't clobber each other
-      const state1 = loadState(join(stateDir, 'board1.bso.json'))
-      const state2 = loadState(join(stateDir, 'board2.bso.json'))
+      const state1 = loadState(join(board1Dir, 'state.json'))
+      const state2 = loadState(join(board2Dir, 'state.json'))
 
       expect(state1.signers['board1.bso']).toBeDefined()
       expect(state2.signers['board2.bso']).toBeDefined()

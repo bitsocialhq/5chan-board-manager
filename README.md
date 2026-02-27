@@ -27,23 +27,28 @@ A CLI tool that implements 4chan-style thread auto-archiving and purging for 5ch
 
 ### Config Directory Layout
 
-Config is stored as one file per board under `~/.config/5chan/`, managed via `5chan board add/edit/remove` or manual editing:
+Config and state are stored per-board under `~/.config/5chan/`, managed via `5chan board add/edit/remove` or manual editing:
 
 ```
 ~/.config/5chan/
-├── global.json              # shared settings (rpcUrl, stateDir, defaults)
+├── global.json                    # shared settings (rpcUrl, defaults)
 └── boards/
-    ├── random.bso.json      # { "address": "random.bso" }
-    ├── tech.bso.json        # { "address": "tech.bso", "bumpLimit": 500 }
-    ├── flash.bso.json       # { "address": "flash.bso", "perPage": 30, "pages": 1 }
-    └── custom.bso.json      # { "address": "custom.bso", "moderationReasons": { ... } }
+    ├── random.bso/
+    │   ├── config.json            # { "address": "random.bso" }
+    │   ├── state.json             # auto-created (signers, archivedThreads)
+    │   └── state.json.lock        # transient lock file
+    ├── tech.bso/
+    │   └── config.json            # { "address": "tech.bso", "bumpLimit": 500 }
+    ├── flash.bso/
+    │   └── config.json            # { "address": "flash.bso", "perPage": 30, "pages": 1 }
+    └── custom.bso/
+        └── config.json            # { "address": "custom.bso", "moderationReasons": { ... } }
 ```
 
 **global.json** (optional):
 ```json
 {
   "rpcUrl": "ws://localhost:9138",
-  "stateDir": "/data/5chan-board-manager",
   "defaults": {
     "perPage": 15,
     "pages": 10,
@@ -59,15 +64,14 @@ Config is stored as one file per board under `~/.config/5chan/`, managed via `5c
 }
 ```
 
-**Minimal config:** a single file `boards/my-board.bso.json` containing `{ "address": "my-board.bso" }`
+**Minimal config:** a single directory `boards/my-board.bso/config.json` containing `{ "address": "my-board.bso" }`
 
 All fields except each board's `address` are optional:
 - `rpcUrl` — falls back to `PLEBBIT_RPC_WS_URL` env var, then `ws://localhost:9138`
-- `stateDir` — falls back to OS data directory
 - `defaults` — applied to all boards unless overridden per-board
 - Per-board fields (`perPage`, `pages`, `bumpLimit`, `archivePurgeSeconds`, `moderationReasons`) override `defaults`
 - `moderationReasons` — optional object with `archiveCapacity`, `archiveBumpLimit`, `purgeArchived`, `purgeDeleted` string fields. Per-board values override defaults per-field (not the whole object). These reason strings are passed to `createCommentModeration()` so plebbit clients can display why a thread was archived or purged.
-- Board filenames must match the address: `{address}.json`
+- Board directory names must match the address field in `config.json`
 
 
 
@@ -172,9 +176,9 @@ docker run -d -v /path/to/data:/data 5chan-board-manager
 
 | Container path | Description |
 |---|---|
-| `/data/5chan/global.json` | Global config (optional — rpcUrl, stateDir, defaults) |
-| `/data/5chan/boards/*.json` | Per-board config files (created by `5chan board add`) |
-| `/data/5chan-board-manager/` | Per-board state files (auto-created) |
+| `/data/5chan/global.json` | Global config (optional — rpcUrl, defaults) |
+| `/data/5chan/boards/<address>/config.json` | Per-board config (created by `5chan board add`) |
+| `/data/5chan/boards/<address>/state.json` | Per-board state (auto-created: signers, archived threads) |
 
 ### Board creation and defaults preset
 
@@ -413,7 +417,7 @@ _See code: [src/commands/start.ts](https://github.com/bitsocialhq/5chan-board-ma
 5. Starts board managers for added boards
 6. Logs the delta: `config reloaded: +N added, -N removed, ~N changed, M running`
 
-This means you can add, edit, or remove boards while the board manager is running — either by editing config files directly or by running `5chan board add/edit/remove` in another terminal. When global config changes (rpcUrl, stateDir, defaults), all running boards are restarted.
+This means you can add, edit, or remove boards while the board manager is running — either by editing config files directly or by running `5chan board add/edit/remove` in another terminal. When global config changes (rpcUrl, defaults), all running boards are restarted.
 
 ## File Locking
 
@@ -446,16 +450,15 @@ Logged via `plebbit-logger` when creating signer or adding mod role.
 When bitsocial-cli changes a board's address (e.g., from a hash like `12D3KooW...` to a named address like `random.bso`), the board manager detects the change automatically via the plebbit-js `update` event and migrates all associated files:
 
 1. Signer key is moved to the new address in the state file
-2. State file is renamed from `{oldAddress}.json` to `{newAddress}.json`
+2. Board directory is renamed from `boards/{oldAddress}/` to `boards/{newAddress}/` (with updated `address` field in `config.json`)
 3. Lock file is re-acquired for the new address
-4. Config file is renamed from `boards/{oldAddress}.json` to `boards/{newAddress}.json` (with updated `address` field)
-5. Internal maps are updated so moderation continues uninterrupted
+4. Internal maps are updated so moderation continues uninterrupted
 
 The mod signer carries over to the new address — no need to re-assign the moderator role. If the migration fails (e.g., lock conflict on the new address), the board manager logs the error and continues operating under the old address.
 
 ## State Persistence
 
-State is stored as one JSON file per board in the state directory (via `env-paths`: `~/.local/share/5chan-board-manager/5chan_board_manager_states/{address}.json`) or a custom directory via `stateDir` in the config.
+State is stored as `state.json` inside each board's directory (`boards/{address}/state.json`), alongside the board's `config.json`.
 
 ```json
 {

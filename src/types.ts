@@ -28,7 +28,7 @@ export interface ModerationReasons {
 export interface BoardManagerOptions {
   subplebbitAddress: string
   plebbitRpcUrl: string
-  stateDir?: string
+  boardDir: string
   userAgent?: string
   perPage?: number
   pages?: number
@@ -82,7 +82,6 @@ export interface BoardDefaults {
 /** Global config stored in global.json */
 export interface GlobalConfig {
   rpcUrl?: string
-  stateDir?: string
   userAgent?: string
   defaults?: BoardDefaults
 }
@@ -90,7 +89,6 @@ export interface GlobalConfig {
 /** Top-level multi-board JSON config */
 export interface MultiBoardConfig {
   rpcUrl?: string
-  stateDir?: string
   userAgent?: string
   defaults?: BoardDefaults
   boards: BoardConfig[]

@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, renameSync, unlinkSync, readdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, renameSync, unlinkSync, readdirSync, rmSync, type Dirent } from 'node:fs'
 import { join, dirname } from 'node:path'
 import type { BoardConfig, GlobalConfig, ModerationReasons, MultiBoardConfig } from './types.js'
 
@@ -7,9 +7,14 @@ export function globalConfigPath(configDir: string): string {
   return join(configDir, 'global.json')
 }
 
-/** Return the path to a board config file inside the boards/ subdirectory */
+/** Return the directory for a specific board */
+export function boardDir(configDir: string, address: string): string {
+  return join(configDir, 'boards', address)
+}
+
+/** Return the path to a board config file inside the board's subdirectory */
 export function boardConfigPath(configDir: string, address: string): string {
-  return join(configDir, 'boards', `${address}.json`)
+  return join(configDir, 'boards', address, 'config.json')
 }
 
 /**
@@ -58,10 +63,6 @@ export function loadGlobalConfig(configDir: string): GlobalConfig {
 
   if (config.rpcUrl !== undefined && typeof config.rpcUrl !== 'string') {
     throw new Error(`Global config "${filePath}": "rpcUrl" must be a string`)
-  }
-
-  if (config.stateDir !== undefined && typeof config.stateDir !== 'string') {
-    throw new Error(`Global config "${filePath}": "stateDir" must be a string`)
   }
 
   if (config.userAgent !== undefined && typeof config.userAgent !== 'string') {
@@ -116,14 +117,15 @@ export function loadBoardConfig(filePath: string): BoardConfig {
 
 /**
  * Load all board configs from the boards/ subdirectory.
+ * Each board is a subdirectory containing a config.json file.
  * Returns [] if the directory doesn't exist.
- * Validates each file and checks for duplicates.
+ * Validates each directory and checks for duplicates.
  */
 function loadAllBoardConfigs(configDir: string): BoardConfig[] {
   const boardsDir = join(configDir, 'boards')
-  let entries: string[]
+  let entries: Dirent[]
   try {
-    entries = readdirSync(boardsDir)
+    entries = readdirSync(boardsDir, { withFileTypes: true })
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
       return []
@@ -131,18 +133,17 @@ function loadAllBoardConfigs(configDir: string): BoardConfig[] {
     throw new Error(`Failed to read boards directory "${boardsDir}": ${(err as Error).message}`)
   }
 
-  const jsonFiles = entries.filter((f) => f.endsWith('.json')).sort()
+  const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort()
   const boards: BoardConfig[] = []
   const seen = new Set<string>()
 
-  for (const file of jsonFiles) {
-    const filePath = join(boardsDir, file)
+  for (const dirName of dirs) {
+    const filePath = join(boardsDir, dirName, 'config.json')
     const board = loadBoardConfig(filePath)
 
-    // Validate filename matches address
-    const expectedFilename = `${board.address}.json`
-    if (file !== expectedFilename) {
-      throw new Error(`Board config "${filePath}": filename "${file}" does not match address "${board.address}" (expected "${expectedFilename}")`)
+    // Validate directory name matches address
+    if (dirName !== board.address) {
+      throw new Error(`Board config "${filePath}": directory name "${dirName}" does not match address "${board.address}" (expected directory "${board.address}")`)
     }
 
     if (seen.has(board.address)) {
@@ -172,40 +173,39 @@ export function saveBoardConfig(configDir: string, board: BoardConfig): void {
 }
 
 /**
- * Rename a board config file when the board's address changes.
- * Loads the old config, writes a new file with the updated address, and deletes the old file.
- * Throws if the new address already has a config file.
+ * Rename a board directory when the board's address changes.
+ * Renames boards/{oldAddress}/ to boards/{newAddress}/ and updates the address
+ * field inside config.json. Throws if the new address already has a directory.
  */
 export function renameBoardConfig(configDir: string, oldAddress: string, newAddress: string): void {
-  const oldPath = boardConfigPath(configDir, oldAddress)
-  const newPath = boardConfigPath(configDir, newAddress)
+  const oldDir = boardDir(configDir, oldAddress)
+  const newDir = boardDir(configDir, newAddress)
 
   // Check for conflict
   try {
-    readFileSync(newPath)
+    readdirSync(newDir)
     throw new Error(`Board config for "${newAddress}" already exists, cannot rename from "${oldAddress}"`)
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
   }
 
-  // Load old config
-  const oldConfig = loadBoardConfig(oldPath)
+  // Rename directory
+  renameSync(oldDir, newDir)
 
-  // Write new config with updated address
+  // Update address field in config.json
+  const configPath = join(newDir, 'config.json')
+  const oldConfig = loadBoardConfig(configPath)
   const newConfig: BoardConfig = { ...oldConfig, address: newAddress }
-  saveBoardConfig(configDir, newConfig)
-
-  // Delete old config file
-  unlinkSync(oldPath)
+  atomicWriteJson(configPath, newConfig)
 }
 
 /**
- * Delete a board config file. Throws if file not found.
+ * Delete a board directory and all its contents. Throws if not found.
  */
 export function deleteBoardConfig(configDir: string, address: string): void {
-  const filePath = boardConfigPath(configDir, address)
+  const dir = boardDir(configDir, address)
   try {
-    unlinkSync(filePath)
+    rmSync(dir, { recursive: true })
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
       throw new Error(`Board "${address}" not found in config`)

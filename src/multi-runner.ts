@@ -1,4 +1,6 @@
 import Logger from '@plebbit/plebbit-logger'
+import { join } from 'node:path'
+import { renameSync } from 'node:fs'
 import { startBoardManager } from './board-manager.js'
 import { resolveBoardManagerOptions } from './multi-config.js'
 import type { BoardManagerResult, MultiBoardConfig, MultiBoardResult } from './types.js'
@@ -12,7 +14,7 @@ const log = Logger('5chan:board-manager:multi')
  * If a board fails to start, the error is recorded and remaining boards continue.
  * If ALL boards fail, throws an AggregateError.
  */
-export async function startMultiBoardManager(config: MultiBoardConfig): Promise<MultiBoardResult> {
+export async function startMultiBoardManager(config: MultiBoardConfig, configDir: string): Promise<MultiBoardResult> {
   const boardManagers = new Map<string, BoardManagerResult>()
   const errors = new Map<string, Error>()
   let stopping = false
@@ -28,6 +30,10 @@ export async function startMultiBoardManager(config: MultiBoardConfig): Promise<
       errors.delete(oldAddress)
       errors.set(newAddress, error)
     }
+
+    // Rename board directory
+    renameSync(join(configDir, 'boards', oldAddress), join(configDir, 'boards', newAddress))
+
     log(`board address changed: ${oldAddress} → ${newAddress}`)
   }
 
@@ -37,7 +43,7 @@ export async function startMultiBoardManager(config: MultiBoardConfig): Promise<
       break
     }
 
-    const options = resolveBoardManagerOptions(board, config)
+    const options = resolveBoardManagerOptions(board, config, configDir)
     try {
       log(`starting board manager for ${board.address}`)
       const result = await startBoardManager({ ...options, onAddressChange })

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, readFileSync, rmSync, mkdirSync, unlinkSync, existsSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, mkdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { startBoardManagers } from './board-managers.js'
@@ -27,9 +27,9 @@ function writeGlobalConfig(dir: string, config: unknown): void {
 }
 
 function writeBoardConfig(dir: string, board: { address: string;[key: string]: unknown }): void {
-  const boardsDir = join(dir, 'boards')
-  mkdirSync(boardsDir, { recursive: true })
-  writeFileSync(join(boardsDir, `${board.address}.json`), JSON.stringify(board))
+  const boardDir = join(dir, 'boards', board.address)
+  mkdirSync(boardDir, { recursive: true })
+  writeFileSync(join(boardDir, 'config.json'), JSON.stringify(board))
 }
 
 describe('startBoardManagers', () => {
@@ -149,7 +149,6 @@ describe('startBoardManagers', () => {
     writeBoardConfig(dir, { address: 'x.bso', bumpLimit: 500 })
     const config: MultiBoardConfig = {
       rpcUrl: 'ws://test:9138',
-      stateDir: '/test/state',
       defaults: { perPage: 20 },
       boards: [{ address: 'x.bso', bumpLimit: 500 }],
     }
@@ -159,7 +158,7 @@ describe('startBoardManagers', () => {
     const opts = mockStartBoardManager.mock.calls[0][0] as BoardManagerOptions
     expect(opts.subplebbitAddress).toBe('x.bso')
     expect(opts.plebbitRpcUrl).toBe('ws://test:9138')
-    expect(opts.stateDir).toBe('/test/state')
+    expect(opts.boardDir).toBe(join(dir, 'boards', 'x.bso'))
     expect(opts.perPage).toBe(20)
     expect(opts.bumpLimit).toBe(500)
 
@@ -323,8 +322,8 @@ describe('startBoardManagers', () => {
       const manager = await startBoardManagers(dir, config)
       expect(manager.boardManagers.size).toBe(2)
 
-      // Remove board config file
-      unlinkSync(join(dir, 'boards', 'b.bso.json'))
+      // Remove board config directory
+      rmSync(join(dir, 'boards', 'b.bso'), { recursive: true })
 
       // Wait for debounce + async handling
       await new Promise((r) => setTimeout(r, 500))
@@ -428,10 +427,10 @@ describe('startBoardManagers', () => {
       opts.onAddressChange!('hash123', 'named.bso')
 
       // Old config should be gone, new one should exist with updated address
-      expect(existsSync(join(dir, 'boards', 'hash123.json'))).toBe(false)
-      expect(existsSync(join(dir, 'boards', 'named.bso.json'))).toBe(true)
+      expect(existsSync(join(dir, 'boards', 'hash123'))).toBe(false)
+      expect(existsSync(join(dir, 'boards', 'named.bso', 'config.json'))).toBe(true)
 
-      const newConfig = JSON.parse(readFileSync(join(dir, 'boards', 'named.bso.json'), 'utf-8'))
+      const newConfig = JSON.parse(readFileSync(join(dir, 'boards', 'named.bso', 'config.json'), 'utf-8'))
       expect(newConfig.address).toBe('named.bso')
       expect(newConfig.bumpLimit).toBe(500)
 

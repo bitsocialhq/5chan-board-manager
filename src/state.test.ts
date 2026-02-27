@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, readFileSync, existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir, hostname } from 'node:os'
-import { loadState, saveState, defaultStateDir, isPidAlive, acquireLock } from './state.js'
+import { loadState, saveState, isPidAlive, acquireLock } from './state.js'
 import type { BoardManagerState } from './types.js'
 
 describe('state', () => {
@@ -213,11 +213,4 @@ describe('state', () => {
     })
   })
 
-  describe('defaultStateDir', () => {
-    it('returns a directory path under 5chan-board-manager data dir', () => {
-      const dir = defaultStateDir()
-      expect(dir).toMatch(/5chan-board-manager/)
-      expect(dir).toMatch(/5chan_board_manager_states$/)
-    })
-  })
 })

@@ -15,10 +15,10 @@ function writeGlobalConfig(dir: string, config: unknown): void {
 }
 
 function writeBoardConfig(dir: string, board: unknown): void {
-  const boardsDir = join(dir, 'boards')
-  mkdirSync(boardsDir, { recursive: true })
   const b = board as { address: string }
-  writeFileSync(join(boardsDir, `${b.address}.json`), JSON.stringify(board))
+  const boardDir = join(dir, 'boards', b.address)
+  mkdirSync(boardDir, { recursive: true })
+  writeFileSync(join(boardDir, 'config.json'), JSON.stringify(board))
 }
 
 describe('loadMultiConfig', () => {
@@ -44,7 +44,6 @@ describe('loadMultiConfig', () => {
     expect(config.boards).toHaveLength(1)
     expect(config.boards[0].address).toBe('board.bso')
     expect(config.rpcUrl).toBeUndefined()
-    expect(config.stateDir).toBeUndefined()
     expect(config.defaults).toBeUndefined()
   })
 
@@ -52,7 +51,6 @@ describe('loadMultiConfig', () => {
     const dir = tmpDir()
     writeGlobalConfig(dir, {
       rpcUrl: 'ws://custom:9138',
-      stateDir: '/data/state',
       defaults: { perPage: 20, pages: 5, bumpLimit: 400, archivePurgeSeconds: 86400 },
     })
     writeBoardConfig(dir, { address: 'a.bso' })
@@ -60,7 +58,6 @@ describe('loadMultiConfig', () => {
 
     const config = loadMultiConfig(dir)
     expect(config.rpcUrl).toBe('ws://custom:9138')
-    expect(config.stateDir).toBe('/data/state')
     expect(config.defaults?.perPage).toBe(20)
     expect(config.boards).toHaveLength(2)
     expect(config.boards.find((b) => b.address === 'b.bso')?.bumpLimit).toBe(600)
@@ -80,17 +77,17 @@ describe('loadMultiConfig', () => {
 
   it('throws when a board has no address', () => {
     const dir = tmpDir()
-    const boardsDir = join(dir, 'boards')
-    mkdirSync(boardsDir, { recursive: true })
-    writeFileSync(join(boardsDir, 'noaddress.json'), JSON.stringify({ perPage: 10 }))
+    const boardDir = join(dir, 'boards', 'noaddress')
+    mkdirSync(boardDir, { recursive: true })
+    writeFileSync(join(boardDir, 'config.json'), JSON.stringify({ perPage: 10 }))
     expect(() => loadMultiConfig(dir)).toThrow('address must be a non-empty string')
   })
 
   it('throws when a board has empty address', () => {
     const dir = tmpDir()
-    const boardsDir = join(dir, 'boards')
-    mkdirSync(boardsDir, { recursive: true })
-    writeFileSync(join(boardsDir, '  .json'), JSON.stringify({ address: '  ' }))
+    const boardDir = join(dir, 'boards', 'some-dir')
+    mkdirSync(boardDir, { recursive: true })
+    writeFileSync(join(boardDir, 'config.json'), JSON.stringify({ address: '  ' }))
     expect(() => loadMultiConfig(dir)).toThrow('address must be a non-empty string')
   })
 
@@ -130,13 +127,6 @@ describe('loadMultiConfig', () => {
     writeGlobalConfig(dir, { rpcUrl: 123 })
     writeBoardConfig(dir, { address: 'x.bso' })
     expect(() => loadMultiConfig(dir)).toThrow('"rpcUrl" must be a string')
-  })
-
-  it('throws when stateDir is not a string', () => {
-    const dir = tmpDir()
-    writeGlobalConfig(dir, { stateDir: true })
-    writeBoardConfig(dir, { address: 'x.bso' })
-    expect(() => loadMultiConfig(dir)).toThrow('"stateDir" must be a string')
   })
 
   it('throws when defaults is not an object', () => {
@@ -198,7 +188,7 @@ describe('resolveBoardManagerOptions', () => {
       rpcUrl: 'ws://config:9138',
       boards: [board],
     }
-    const opts = resolveBoardManagerOptions(board, config)
+    const opts = resolveBoardManagerOptions(board, config, '/test/config')
     expect(opts.plebbitRpcUrl).toBe('ws://config:9138')
   })
 
@@ -206,7 +196,7 @@ describe('resolveBoardManagerOptions', () => {
     process.env.PLEBBIT_RPC_WS_URL = 'ws://env:9138'
     const board: BoardConfig = { address: 'a.bso' }
     const config: MultiBoardConfig = { boards: [board] }
-    const opts = resolveBoardManagerOptions(board, config)
+    const opts = resolveBoardManagerOptions(board, config, '/test/config')
     expect(opts.plebbitRpcUrl).toBe('ws://env:9138')
   })
 
@@ -214,7 +204,7 @@ describe('resolveBoardManagerOptions', () => {
     delete process.env.PLEBBIT_RPC_WS_URL
     const board: BoardConfig = { address: 'a.bso' }
     const config: MultiBoardConfig = { boards: [board] }
-    const opts = resolveBoardManagerOptions(board, config)
+    const opts = resolveBoardManagerOptions(board, config, '/test/config')
     expect(opts.plebbitRpcUrl).toBe('ws://localhost:9138')
   })
 
@@ -224,7 +214,7 @@ describe('resolveBoardManagerOptions', () => {
       defaults: { bumpLimit: 300, perPage: 15, pages: 5 },
       boards: [board],
     }
-    const opts = resolveBoardManagerOptions(board, config)
+    const opts = resolveBoardManagerOptions(board, config, '/test/config')
     expect(opts.bumpLimit).toBe(500)
     expect(opts.perPage).toBe(30)
     expect(opts.pages).toBe(5)
@@ -233,28 +223,25 @@ describe('resolveBoardManagerOptions', () => {
   it('leaves unset fields as undefined so startArchiver uses its own defaults', () => {
     const board: BoardConfig = { address: 'a.bso' }
     const config: MultiBoardConfig = { boards: [board] }
-    const opts = resolveBoardManagerOptions(board, config)
+    const opts = resolveBoardManagerOptions(board, config, '/test/config')
     expect(opts.perPage).toBeUndefined()
     expect(opts.pages).toBeUndefined()
     expect(opts.bumpLimit).toBeUndefined()
     expect(opts.archivePurgeSeconds).toBeUndefined()
-    expect(opts.stateDir).toBeUndefined()
+    expect(opts.boardDir).toBe(join('/test/config', 'boards', 'a.bso'))
   })
 
-  it('passes stateDir from config', () => {
+  it('computes boardDir from configDir and board address', () => {
     const board: BoardConfig = { address: 'a.bso' }
-    const config: MultiBoardConfig = {
-      stateDir: '/data/state',
-      boards: [board],
-    }
-    const opts = resolveBoardManagerOptions(board, config)
-    expect(opts.stateDir).toBe('/data/state')
+    const config: MultiBoardConfig = { boards: [board] }
+    const opts = resolveBoardManagerOptions(board, config, '/test/config')
+    expect(opts.boardDir).toBe(join('/test/config', 'boards', 'a.bso'))
   })
 
   it('sets subplebbitAddress from board address', () => {
     const board: BoardConfig = { address: 'my-board.bso' }
     const config: MultiBoardConfig = { boards: [board] }
-    const opts = resolveBoardManagerOptions(board, config)
+    const opts = resolveBoardManagerOptions(board, config, '/test/config')
     expect(opts.subplebbitAddress).toBe('my-board.bso')
   })
 
@@ -272,7 +259,7 @@ describe('resolveBoardManagerOptions', () => {
       },
       boards: [board],
     }
-    const opts = resolveBoardManagerOptions(board, config)
+    const opts = resolveBoardManagerOptions(board, config, '/test/config')
     expect(opts.moderationReasons?.archiveCapacity).toBe('board override')
     expect(opts.moderationReasons?.archiveBumpLimit).toBe('default bump')
   })
@@ -280,7 +267,7 @@ describe('resolveBoardManagerOptions', () => {
   it('returns undefined moderationReasons when neither board nor defaults set it', () => {
     const board: BoardConfig = { address: 'a.bso' }
     const config: MultiBoardConfig = { boards: [board] }
-    const opts = resolveBoardManagerOptions(board, config)
+    const opts = resolveBoardManagerOptions(board, config, '/test/config')
     expect(opts.moderationReasons).toBeUndefined()
   })
 
@@ -290,14 +277,14 @@ describe('resolveBoardManagerOptions', () => {
       userAgent: 'custom-agent:2.0',
       boards: [board],
     }
-    const opts = resolveBoardManagerOptions(board, config)
+    const opts = resolveBoardManagerOptions(board, config, '/test/config')
     expect(opts.userAgent).toBe('custom-agent:2.0')
   })
 
   it('leaves userAgent undefined when not set in config', () => {
     const board: BoardConfig = { address: 'a.bso' }
     const config: MultiBoardConfig = { boards: [board] }
-    const opts = resolveBoardManagerOptions(board, config)
+    const opts = resolveBoardManagerOptions(board, config, '/test/config')
     expect(opts.userAgent).toBeUndefined()
   })
 })

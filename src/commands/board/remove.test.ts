@@ -57,8 +57,8 @@ describe('board remove command', () => {
 
     await runCommand(['a.bso'], dir)
 
-    expect(existsSync(join(dir, 'boards', 'a.bso.json'))).toBe(false)
-    expect(existsSync(join(dir, 'boards', 'b.bso.json'))).toBe(true)
+    expect(existsSync(join(dir, 'boards', 'a.bso'))).toBe(false)
+    expect(existsSync(join(dir, 'boards', 'b.bso', 'config.json'))).toBe(true)
   })
 
   it('throws when board not found', async () => {

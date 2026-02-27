@@ -1,16 +1,11 @@
 import { readFileSync, writeFileSync, mkdirSync, renameSync, unlinkSync, openSync, closeSync } from 'node:fs'
-import { join, dirname } from 'node:path'
+import { dirname } from 'node:path'
 import { hostname } from 'node:os'
-import envPaths from 'env-paths'
 import type { BoardManagerState, FileLock } from './types.js'
 
 const DEFAULT_STATE: BoardManagerState = {
   signers: {},
   archivedThreads: {},
-}
-
-export function defaultStateDir(): string {
-  return join(envPaths('5chan-board-manager').data, '5chan_board_manager_states')
 }
 
 export function loadState(path: string): BoardManagerState {

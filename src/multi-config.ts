@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { loadConfig } from './config-manager.js'
 import type { BoardManagerOptions, BoardConfig, ModerationReasons, MultiBoardConfig } from './types.js'
 
@@ -16,13 +17,13 @@ export function loadMultiConfig(configDir: string): MultiBoardConfig {
 }
 
 /**
- * Merge a board config with top-level defaults and rpcUrl/stateDir
+ * Merge a board config with top-level defaults and rpcUrl
  * to produce BoardManagerOptions for startBoardManager().
  *
  * Only sets fields that are explicitly configured — undefined fields
  * let startBoardManager's built-in DEFAULTS remain the source of truth.
  */
-export function resolveBoardManagerOptions(board: BoardConfig, config: MultiBoardConfig): BoardManagerOptions {
+export function resolveBoardManagerOptions(board: BoardConfig, config: MultiBoardConfig, configDir: string): BoardManagerOptions {
   const rpcUrl = config.rpcUrl ?? process.env.PLEBBIT_RPC_WS_URL ?? 'ws://localhost:9138'
 
   const boardReasons = board.moderationReasons
@@ -40,7 +41,7 @@ export function resolveBoardManagerOptions(board: BoardConfig, config: MultiBoar
   return {
     subplebbitAddress: board.address,
     plebbitRpcUrl: rpcUrl,
-    stateDir: config.stateDir,
+    boardDir: join(configDir, 'boards', board.address),
     userAgent: config.userAgent,
     perPage: board.perPage ?? config.defaults?.perPage,
     pages: board.pages ?? config.defaults?.pages,

@@ -64,7 +64,7 @@ export async function startBoardManagers(
 
   // Start initial board managers sequentially
   for (const board of initialConfig.boards) {
-    const options = resolveBoardManagerOptions(board, initialConfig)
+    const options = resolveBoardManagerOptions(board, initialConfig, configDir)
     try {
       log(`starting board manager for ${board.address}`)
       const result = await startBoardManager({ ...options, onAddressChange })
@@ -132,7 +132,7 @@ export async function startBoardManagers(
         }
         errors.delete(board.address)
 
-        const options = resolveBoardManagerOptions(board, newConfig)
+        const options = resolveBoardManagerOptions(board, newConfig, configDir)
         try {
           log(`starting board manager for changed board ${board.address}`)
           const result = await startBoardManager({ ...options, onAddressChange })
@@ -146,7 +146,7 @@ export async function startBoardManagers(
 
       // Start added board managers
       for (const board of added) {
-        const options = resolveBoardManagerOptions(board, newConfig)
+        const options = resolveBoardManagerOptions(board, newConfig, configDir)
         try {
           log(`starting board manager for added board ${board.address}`)
           const result = await startBoardManager({ ...options, onAddressChange })
@@ -184,7 +184,7 @@ export async function startBoardManagers(
   // Watch boards/ directory — ensure it exists so the watcher works on first run
   const boardsDir = join(configDir, 'boards')
   mkdirSync(boardsDir, { recursive: true })
-  watchers.push(watch(boardsDir, triggerReload))
+  watchers.push(watch(boardsDir, { recursive: true }, triggerReload))
 
   // Watch global.json
   const globalPath = globalConfigPath(configDir)
@@ -226,7 +226,7 @@ export async function startBoardManagers(
 }
 
 /**
- * Diff two configs, treating global config changes (rpcUrl, stateDir, defaults)
+ * Diff two configs, treating global config changes (rpcUrl, defaults)
  * as triggering all existing boards to be "changed" (restart needed).
  */
 function diffConfigsWithGlobal(
@@ -245,7 +245,6 @@ function diffConfigsWithGlobal(
   // Check if global settings changed
   const globalChanged =
     oldConfig.rpcUrl !== newConfig.rpcUrl ||
-    oldConfig.stateDir !== newConfig.stateDir ||
     oldConfig.userAgent !== newConfig.userAgent ||
     JSON.stringify(oldConfig.defaults) !== JSON.stringify(newConfig.defaults)
 

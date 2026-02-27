@@ -60,9 +60,9 @@ function makeTmpDir(): string {
 }
 
 function writeBoardConfig(dir: string, board: { address: string;[key: string]: unknown }): void {
-  const boardsDir = join(dir, 'boards')
-  mkdirSync(boardsDir, { recursive: true })
-  writeFileSync(join(boardsDir, `${board.address}.json`), JSON.stringify(board))
+  const boardDir = join(dir, 'boards', board.address)
+  mkdirSync(boardDir, { recursive: true })
+  writeFileSync(join(boardDir, 'config.json'), JSON.stringify(board))
 }
 
 async function runCommand(
@@ -380,7 +380,7 @@ describe('board add command', () => {
     const dir = tmpDir()
     await runCommand(['my-board.bso', '--skip-apply-defaults'], dir, { interactive: false })
 
-    expect(existsSync(join(dir, 'boards', 'my-board.bso.json'))).toBe(true)
+    expect(existsSync(join(dir, 'boards', 'my-board.bso', 'config.json'))).toBe(true)
   })
 
   it('throws descriptive error for unknown flag', async () => {

@@ -19,10 +19,10 @@ function writeGlobalConfig(dir: string, config: unknown): void {
 }
 
 function writeBoardConfig(dir: string, board: unknown): void {
-  const boardsDir = join(dir, 'boards')
-  mkdirSync(boardsDir, { recursive: true })
   const b = board as { address: string }
-  writeFileSync(join(boardsDir, `${b.address}.json`), JSON.stringify(board))
+  const boardDir = join(dir, 'boards', b.address)
+  mkdirSync(boardDir, { recursive: true })
+  writeFileSync(join(boardDir, 'config.json'), JSON.stringify(board))
 }
 
 describe('path helpers', () => {
@@ -30,8 +30,8 @@ describe('path helpers', () => {
     expect(globalConfigPath('/foo/bar')).toBe(join('/foo/bar', 'global.json'))
   })
 
-  it('boardConfigPath returns boards/{address}.json path', () => {
-    expect(boardConfigPath('/foo/bar', 'test.bso')).toBe(join('/foo/bar', 'boards', 'test.bso.json'))
+  it('boardConfigPath returns boards/{address}/config.json path', () => {
+    expect(boardConfigPath('/foo/bar', 'test.bso')).toBe(join('/foo/bar', 'boards', 'test.bso', 'config.json'))
   })
 })
 
@@ -77,7 +77,6 @@ describe('loadConfig', () => {
     const dir = tmpDir()
     writeGlobalConfig(dir, {
       rpcUrl: 'ws://custom:9138',
-      stateDir: '/data/state',
       defaults: { perPage: 20, pages: 5, bumpLimit: 400, archivePurgeSeconds: 86400 },
     })
     writeBoardConfig(dir, { address: 'a.bso' })
@@ -85,7 +84,6 @@ describe('loadConfig', () => {
 
     const config = loadConfig(dir)
     expect(config.rpcUrl).toBe('ws://custom:9138')
-    expect(config.stateDir).toBe('/data/state')
     expect(config.defaults?.perPage).toBe(20)
     expect(config.boards).toHaveLength(2)
     expect(config.boards.find((b) => b.address === 'b.bso')?.bumpLimit).toBe(600)
@@ -110,14 +108,12 @@ describe('loadConfig', () => {
     expect(() => loadConfig(dir)).toThrow('must contain a JSON object')
   })
 
-  it('throws on duplicate board addresses', () => {
+  it('throws on directory name / address mismatch', () => {
     const dir = tmpDir()
-    const boardsDir = join(dir, 'boards')
-    mkdirSync(boardsDir, { recursive: true })
-    // Write two files with same address but different filenames (impossible if filename matches)
-    // Actually with filename validation this can't happen, test that filename mismatch is caught
-    writeFileSync(join(boardsDir, 'wrong.json'), JSON.stringify({ address: 'board.bso' }))
-    expect(() => loadConfig(dir)).toThrow('filename "wrong.json" does not match address "board.bso"')
+    const wrongDir = join(dir, 'boards', 'wrong')
+    mkdirSync(wrongDir, { recursive: true })
+    writeFileSync(join(wrongDir, 'config.json'), JSON.stringify({ address: 'board.bso' }))
+    expect(() => loadConfig(dir)).toThrow('directory name "wrong" does not match address "board.bso"')
   })
 
   it('throws when a numeric field is not a positive integer', () => {
@@ -130,12 +126,6 @@ describe('loadConfig', () => {
     const dir = tmpDir()
     writeGlobalConfig(dir, { rpcUrl: 123 })
     expect(() => loadConfig(dir)).toThrow('"rpcUrl" must be a string')
-  })
-
-  it('throws when stateDir is not a string', () => {
-    const dir = tmpDir()
-    writeGlobalConfig(dir, { stateDir: true })
-    expect(() => loadConfig(dir)).toThrow('"stateDir" must be a string')
   })
 
   it('throws when userAgent is not a string', () => {
@@ -160,9 +150,9 @@ describe('loadConfig', () => {
 
   it('throws when board address is empty string', () => {
     const dir = tmpDir()
-    const boardsDir = join(dir, 'boards')
-    mkdirSync(boardsDir, { recursive: true })
-    writeFileSync(join(boardsDir, '.json'), JSON.stringify({ address: '  ' }))
+    const boardDir = join(dir, 'boards', 'some-dir')
+    mkdirSync(boardDir, { recursive: true })
+    writeFileSync(join(boardDir, 'config.json'), JSON.stringify({ address: '  ' }))
     expect(() => loadConfig(dir)).toThrow('address must be a non-empty string')
   })
 
@@ -222,9 +212,9 @@ describe('saveGlobalConfig', () => {
   it('creates parent directories', () => {
     const dir = tmpDir()
     const nested = join(dir, 'nested', 'deep')
-    saveGlobalConfig(nested, { stateDir: '/test' })
+    saveGlobalConfig(nested, { rpcUrl: 'ws://test:1234' })
     const written = readFileSync(join(nested, 'global.json'), 'utf-8')
-    expect(JSON.parse(written)).toEqual({ stateDir: '/test' })
+    expect(JSON.parse(written)).toEqual({ rpcUrl: 'ws://test:1234' })
   })
 })
 
@@ -244,11 +234,11 @@ describe('saveBoardConfig', () => {
     dirs.length = 0
   })
 
-  it('writes board config to boards/{address}.json', () => {
+  it('writes board config to boards/{address}/config.json', () => {
     const dir = tmpDir()
     const board: BoardConfig = { address: 'test.bso', bumpLimit: 500 }
     saveBoardConfig(dir, board)
-    const written = readFileSync(join(dir, 'boards', 'test.bso.json'), 'utf-8')
+    const written = readFileSync(join(dir, 'boards', 'test.bso', 'config.json'), 'utf-8')
     expect(JSON.parse(written)).toEqual(board)
     expect(written.endsWith('\n')).toBe(true)
   })
@@ -256,21 +246,21 @@ describe('saveBoardConfig', () => {
   it('creates boards/ directory if missing', () => {
     const dir = tmpDir()
     saveBoardConfig(dir, { address: 'new.bso' })
-    expect(existsSync(join(dir, 'boards', 'new.bso.json'))).toBe(true)
+    expect(existsSync(join(dir, 'boards', 'new.bso', 'config.json'))).toBe(true)
   })
 
   it('overwrites existing board config', () => {
     const dir = tmpDir()
     saveBoardConfig(dir, { address: 'a.bso', bumpLimit: 300 })
     saveBoardConfig(dir, { address: 'a.bso', bumpLimit: 500 })
-    const written = JSON.parse(readFileSync(join(dir, 'boards', 'a.bso.json'), 'utf-8'))
+    const written = JSON.parse(readFileSync(join(dir, 'boards', 'a.bso', 'config.json'), 'utf-8'))
     expect(written.bumpLimit).toBe(500)
   })
 
   it('does not leave a .tmp file after successful write', () => {
     const dir = tmpDir()
     saveBoardConfig(dir, { address: 'a.bso' })
-    const filePath = join(dir, 'boards', 'a.bso.json')
+    const filePath = join(dir, 'boards', 'a.bso', 'config.json')
     expect(existsSync(filePath)).toBe(true)
     expect(existsSync(filePath + '.tmp')).toBe(false)
   })
@@ -292,13 +282,13 @@ describe('deleteBoardConfig', () => {
     dirs.length = 0
   })
 
-  it('deletes a board config file', () => {
+  it('deletes a board directory', () => {
     const dir = tmpDir()
     saveBoardConfig(dir, { address: 'a.bso' })
-    expect(existsSync(join(dir, 'boards', 'a.bso.json'))).toBe(true)
+    expect(existsSync(join(dir, 'boards', 'a.bso'))).toBe(true)
 
     deleteBoardConfig(dir, 'a.bso')
-    expect(existsSync(join(dir, 'boards', 'a.bso.json'))).toBe(false)
+    expect(existsSync(join(dir, 'boards', 'a.bso'))).toBe(false)
   })
 
   it('throws when board not found', () => {

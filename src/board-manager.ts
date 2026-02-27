@@ -1,8 +1,7 @@
 import { connectToPlebbitRpc } from './plebbit-rpc.js'
 import Logger from '@plebbit/plebbit-logger'
-import { join } from 'node:path'
-import { unlinkSync } from 'node:fs'
-import { loadState, saveState, defaultStateDir, acquireLock } from './state.js'
+import { join, dirname } from 'node:path'
+import { loadState, saveState, acquireLock } from './state.js'
 import type { BoardManagerOptions, BoardManagerResult, BoardManagerState, Comment, FileLock, ModerationReasons, Subplebbit, Signer, ThreadComment, Page } from './types.js'
 
 const log = Logger('5chan:board-manager:archiver')
@@ -40,8 +39,7 @@ export async function startBoardManager(options: BoardManagerOptions): Promise<B
   }
 
   const maxThreads = perPage * pages
-  const stateDir = options.stateDir ?? defaultStateDir()
-  let statePath = join(stateDir, `${subplebbitAddress}.json`)
+  let statePath = join(options.boardDir, 'state.json')
 
   let fileLock: FileLock
   try {
@@ -91,11 +89,10 @@ export async function startBoardManager(options: BoardManagerOptions): Promise<B
   function migrateAddress(newAddress: string): void {
     const oldAddress = subplebbitAddress
     const oldStatePath = statePath
-    const newStatePath = join(stateDir, `${newAddress}.json`)
 
     log(`address changed: ${oldAddress} → ${newAddress}, migrating state`)
 
-    // Migrate signer key
+    // Migrate signer key in memory
     if (state.signers[oldAddress]) {
       state.signers[newAddress] = state.signers[oldAddress]
       delete state.signers[oldAddress]
@@ -104,15 +101,23 @@ export async function startBoardManager(options: BoardManagerOptions): Promise<B
     // Release old lock
     fileLock.release()
 
-    // Save state to new path
-    saveState(newStatePath, state)
+    // Save state with migrated signers to current path (directory still has old name)
+    saveState(statePath, state)
+
+    // Notify caller — renames boards/{oldAddress}/ to boards/{newAddress}/
+    options.onAddressChange?.(oldAddress, newAddress)
+
+    // Compute new paths (directory has been renamed by onAddressChange)
+    const boardsParentDir = dirname(options.boardDir)
+    const newStatePath = join(boardsParentDir, newAddress, 'state.json')
 
     // Acquire lock on new path
     try {
       fileLock = acquireLock(newStatePath)
     } catch (err) {
-      // Rollback: re-acquire old lock, restore signer key
+      // Rollback: rename directory back, restore signer key, re-lock
       log.error(`failed to acquire lock on new state path ${newStatePath}: ${err}`)
+      try { options.onAddressChange?.(newAddress, oldAddress) } catch {}
       if (state.signers[newAddress]) {
         state.signers[oldAddress] = state.signers[newAddress]
         delete state.signers[newAddress]
@@ -122,15 +127,9 @@ export async function startBoardManager(options: BoardManagerOptions): Promise<B
       throw err
     }
 
-    // Delete old state file (best-effort)
-    try { unlinkSync(oldStatePath) } catch {}
-
     // Update mutable references
     subplebbitAddress = newAddress
     statePath = newStatePath
-
-    // Notify caller
-    options.onAddressChange?.(oldAddress, newAddress)
 
     log(`address migration complete: ${oldAddress} → ${newAddress}`)
   }

@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.1](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.2.0...v0.2.1) (2026-02-27)
+
+### Bug Fixes
+
+* **ci:** update board config path to match per-board directory structure ([325f029](https://github.com/bitsocialhq/5chan-board-manager/commit/325f029084d8b2b8661da8638d99a30c36c05e62))
+
 ## [0.2.0](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.15...v0.2.0) (2026-02-27)
 
 ### ⚠ BREAKING CHANGES

@@ -159,6 +159,12 @@ docker compose exec 5chan 5chan board edit random.bso --reset per-page
 # Reset moderation reasons to defaults
 docker compose exec 5chan 5chan board edit random.bso --reset moderation-reasons
 
+# Set global defaults for all boards
+docker compose exec 5chan 5chan defaults set --per-page 20 --bump-limit 500
+
+# Open global defaults in $EDITOR for interactive editing
+docker compose exec 5chan 5chan defaults set -i
+
 # Remove a board
 docker compose exec 5chan 5chan board remove random.bso
 ```
@@ -205,6 +211,7 @@ The bundled preset file is `src/presets/community-defaults.jsonc`.
 * [`5chan board edit ADDRESS`](#5chan-board-edit-address)
 * [`5chan board list`](#5chan-board-list)
 * [`5chan board remove ADDRESS`](#5chan-board-remove-address)
+* [`5chan defaults set`](#5chan-defaults-set)
 * [`5chan help [COMMAND]`](#5chan-help-command)
 * [`5chan start`](#5chan-start)
 
@@ -353,6 +360,46 @@ EXAMPLES
 ```
 
 _See code: [src/commands/board/remove.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.2.1/src/commands/board/remove.ts)_
+
+## `5chan defaults set`
+
+Set global default settings for all boards
+
+```
+USAGE
+  $ 5chan defaults set [-i | --per-page <value> | --pages <value> | --bump-limit <value> |
+    --archive-purge-seconds <value> | --reset <value>]
+
+FLAGS
+  -i, --interactive                    Open defaults in $EDITOR for interactive editing
+      --archive-purge-seconds=<value>  Seconds after archiving before purge
+      --bump-limit=<value>             Bump limit for threads
+      --pages=<value>                  Number of pages
+      --per-page=<value>               Posts per page
+      --reset=<value>                  Comma-separated fields to remove from defaults (per-page, pages, bump-limit,
+                                       archive-purge-seconds, moderation-reasons)
+
+DESCRIPTION
+  Set global default settings for all boards
+
+  Defaults in global.json apply to every board unless overridden per-board.
+  Use --interactive (-i) to open the defaults object in $EDITOR for direct editing.
+
+EXAMPLES
+  $ 5chan defaults set --per-page 20
+
+  $ 5chan defaults set --bump-limit 500 --pages 10
+
+  $ 5chan defaults set --reset per-page,bump-limit
+
+  $ 5chan defaults set --per-page 20 --reset bump-limit
+
+  $ 5chan defaults set --interactive
+
+  $ 5chan defaults set -i
+```
+
+_See code: [src/commands/defaults/set.ts](https://github.com/bitsocialhq/5chan-board-manager/blob/v0.2.0/src/commands/defaults/set.ts)_
 
 ## `5chan help [COMMAND]`
 

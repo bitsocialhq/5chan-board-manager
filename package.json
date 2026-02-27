@@ -28,6 +28,9 @@
     "topics": {
       "board": {
         "description": "Manage boards in the config"
+      },
+      "defaults": {
+        "description": "Manage global default settings"
       }
     }
   },

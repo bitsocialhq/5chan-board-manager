@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.3](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.2.2...v0.2.3) (2026-02-27)
+
+### Bug Fixes
+
+* **ci:** separate cache scopes to eliminate redundant builds in publish job ([e076e25](https://github.com/bitsocialhq/5chan-board-manager/commit/e076e25daf28855085db4fd0298208d3e241c884))
+
 ## [0.2.2](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.2.1...v0.2.2) (2026-02-27)
 
 ### Features

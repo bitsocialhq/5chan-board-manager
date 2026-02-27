@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.2](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.2.1...v0.2.2) (2026-02-27)
+
+### Features
+
+* add `defaults set` CLI command with Zod schema validation ([085575f](https://github.com/bitsocialhq/5chan-board-manager/commit/085575fc7f7b9e69a4e0b58d3e73025ca120161e))
+
 ## [0.2.1](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.2.0...v0.2.1) (2026-02-27)
 
 ### Bug Fixes

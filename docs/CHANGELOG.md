@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.15](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.14...v0.1.15) (2026-02-27)
+
+### Bug Fixes
+
+* store hostname in lock file to prevent infinite restart loop in Docker ([02339ab](https://github.com/bitsocialhq/5chan-board-manager/commit/02339ab6a026910317bd9b63b0cc4f53402a2a02))
+
 ## [0.1.14](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.13...v0.1.14) (2026-02-25)
 
 ### Bug Fixes

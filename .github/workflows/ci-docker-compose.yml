@@ -158,7 +158,7 @@ jobs:
       - name: Verify boardManagerSettings in config
         run: |
           BOARD_JSON=$(docker compose exec -T 5chan \
-            cat "/data/5chan/boards/${{ steps.community.outputs.address }}.json")
+            cat "/data/5chan/boards/${{ steps.community.outputs.address }}/config.json")
 
           echo "$BOARD_JSON" | jq .
 
@@ -286,7 +286,7 @@ jobs:
       - name: Verify boardManagerSettings in config
         run: |
           BOARD_JSON=$(docker compose exec -T 5chan \
-            cat "/data/5chan/boards/${{ steps.community.outputs.address }}.json")
+            cat "/data/5chan/boards/${{ steps.community.outputs.address }}/config.json")
 
           echo "$BOARD_JSON" | jq .
 

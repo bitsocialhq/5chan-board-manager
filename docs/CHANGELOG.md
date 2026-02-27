@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.2.0](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.15...v0.2.0) (2026-02-27)
+
+### ⚠ BREAKING CHANGES
+
+* board config files moved from `boards/{address}.json`
+to `boards/{address}/config.json`, and state files now live alongside
+config in each board's directory instead of a separate stateDir.
+
+- Replace flat board config files with per-board directories
+- Co-locate state.json and lock files in each board directory
+- Replace `stateDir` option with required `boardDir` in BoardManagerOptions
+- Add `configDir` parameter to resolveBoardManagerOptions and startMultiBoardManager
+- Remove env-paths dependency (no longer needed without defaultStateDir)
+- Simplify address changes to a single directory rename
+
+### refactor
+
+* consolidate per-board config and state into per-board directories ([79a5ed9](https://github.com/bitsocialhq/5chan-board-manager/commit/79a5ed938c2a2f30a8a4c8fce187a4e8ede99e15))
+
+### Bug Fixes
+
+* **ci:** increase Docker build timeout to 30 minutes ([e2f8d2c](https://github.com/bitsocialhq/5chan-board-manager/commit/e2f8d2c26d869780070125bcdb468b61b81989a3))
+
 ## [0.1.15](https://github.com/bitsocialhq/5chan-board-manager/compare/v0.1.14...v0.1.15) (2026-02-27)
 
 ### Bug Fixes
